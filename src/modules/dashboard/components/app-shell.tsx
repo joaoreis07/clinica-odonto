@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { Bell, FileBarChart2, Settings, Wallet } from "lucide-react";
+import { FileBarChart2, Settings, Wallet } from "lucide-react";
 import { FinanceDashboard } from "@/modules/finance/components/finance-dashboard";
 import { FinanceProvider } from "@/modules/finance/context";
 import { ReportsDashboard } from "@/modules/reports/components/reports-dashboard";
@@ -20,7 +20,7 @@ export function AppShell() {
 
   return (
     <FinanceProvider>
-      <div className="min-h-screen bg-slate-50 text-slate-900">
+      <div className="min-h-screen bg-slate-50 text-slate-900 pb-24 lg:pb-0">
         <aside className="fixed inset-y-0 hidden w-64 border-r border-slate-800 bg-slate-950 px-4 py-6 text-slate-400 lg:block">
           <div className="flex items-center gap-3 px-2">
             <div className="relative size-11 shrink-0 overflow-hidden rounded-full border border-white/10 bg-white">
@@ -64,48 +64,27 @@ export function AppShell() {
         </aside>
 
         <div className="lg:pl-64">
-          <header className="flex h-16 items-center justify-between border-b border-slate-200 bg-white px-4 sm:h-20 sm:px-5 lg:px-9">
-            <div className="flex items-center gap-3">
-              <div className="relative size-9 overflow-hidden rounded-full border border-slate-200 lg:hidden">
-                <Image
-                  src="/logo-clinica-odonto.png"
-                  alt="Clínica Odonto"
-                  fill
-                  className="object-cover"
-                  sizes="36px"
-                />
+          <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
+            <div className="flex h-14 items-center justify-between px-4 sm:h-16 sm:px-5 lg:h-20 lg:px-9">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="relative size-9 shrink-0 overflow-hidden rounded-full border border-slate-200 lg:hidden">
+                  <Image
+                    src="/logo-clinica-odonto.png"
+                    alt="Clínica Odonto"
+                    fill
+                    className="object-cover"
+                    sizes="36px"
+                  />
+                </div>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold tracking-[-0.03em] text-slate-900 lg:hidden">
+                    Clínica Odonto
+                  </p>
+                  <h1 className="hidden text-xl font-semibold tracking-[-0.035em] lg:block">
+                    {active}
+                  </h1>
+                </div>
               </div>
-              <div>
-                <p className="text-xs text-slate-400 lg:hidden">Clínica Odonto</p>
-                <h1 className="text-lg font-semibold tracking-[-0.035em] sm:text-xl">
-                  {active}
-                </h1>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 sm:gap-3">
-              <div className="flex max-w-[50vw] gap-1 overflow-x-auto lg:hidden">
-                {NAV.map(({ label }) => (
-                  <button
-                    key={label}
-                    type="button"
-                    onClick={() => setActive(label)}
-                    className={cn(
-                      "shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-semibold",
-                      active === label
-                        ? "bg-blue-600 text-white"
-                        : "bg-slate-100 text-slate-600",
-                    )}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-              <button
-                className="relative grid size-9 place-items-center rounded-xl border border-slate-200 bg-white text-slate-500"
-                type="button"
-              >
-                <Bell className="size-4" />
-              </button>
             </div>
           </header>
 
@@ -119,6 +98,27 @@ export function AppShell() {
             )}
           </main>
         </div>
+
+        <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur lg:hidden">
+          <div className="mx-auto grid max-w-lg grid-cols-3 gap-1">
+            {NAV.map(({ icon: Icon, label }) => (
+              <button
+                key={label}
+                type="button"
+                onClick={() => setActive(label)}
+                className={cn(
+                  "flex flex-col items-center gap-1 rounded-xl px-2 py-2 text-[11px] font-semibold transition",
+                  active === label
+                    ? "bg-blue-50 text-blue-700"
+                    : "text-slate-500",
+                )}
+              >
+                <Icon className="size-5" />
+                <span className="truncate">{label}</span>
+              </button>
+            ))}
+          </div>
+        </nav>
       </div>
     </FinanceProvider>
   );

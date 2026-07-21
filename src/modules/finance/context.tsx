@@ -6,14 +6,14 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
-import { TEAM as DEFAULT_TEAM, initialMovements } from "./data";
 import type { FinanceMovement } from "./types";
 
-const MOVEMENTS_KEY = "clinica-odonto-movements";
-const TEAM_KEY = "clinica-odonto-team";
+const LOCAL_MOVEMENTS_KEY = "clinica-odonto-movements";
+const LOCAL_TEAM_KEY = "clinica-odonto-team";
 
 type FinanceContextValue = {
   movements: FinanceMovement[];
@@ -23,54 +23,133 @@ type FinanceContextValue = {
   addResponsible: (name: string) => boolean;
   removeResponsible: (name: string) => void;
   ready: boolean;
+  syncing: boolean;
 };
 
 const FinanceContext = createContext<FinanceContextValue | null>(null);
 
-function loadMovements(): FinanceMovement[] {
-  if (typeof window === "undefined") return initialMovements;
+function readLocalFallback(): { movements: FinanceMovement[]; team: string[] } {
+  if (typeof window === "undefined") return { movements: [], team: [] };
   try {
-    const raw = window.localStorage.getItem(MOVEMENTS_KEY);
-    if (!raw) return initialMovements;
-    const parsed = JSON.parse(raw) as FinanceMovement[];
-    return Array.isArray(parsed) ? parsed : initialMovements;
+    const movementsRaw = window.localStorage.getItem(LOCAL_MOVEMENTS_KEY);
+    const teamRaw = window.localStorage.getItem(LOCAL_TEAM_KEY);
+    const movements = movementsRaw
+      ? (JSON.parse(movementsRaw) as FinanceMovement[])
+      : [];
+    const team = teamRaw ? (JSON.parse(teamRaw) as string[]) : [];
+    return {
+      movements: Array.isArray(movements) ? movements : [],
+      team: Array.isArray(team) ? team : [],
+    };
   } catch {
-    return initialMovements;
+    return { movements: [], team: [] };
   }
 }
 
-function loadTeam(): string[] {
-  if (typeof window === "undefined") return DEFAULT_TEAM;
-  try {
-    const raw = window.localStorage.getItem(TEAM_KEY);
-    if (raw === null) return DEFAULT_TEAM;
-    const parsed = JSON.parse(raw) as string[];
-    return Array.isArray(parsed) ? parsed : DEFAULT_TEAM;
-  } catch {
-    return DEFAULT_TEAM;
-  }
+function clearLocalFallback() {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(LOCAL_MOVEMENTS_KEY);
+  window.localStorage.removeItem(LOCAL_TEAM_KEY);
 }
 
 export function FinanceProvider({ children }: { children: ReactNode }) {
-  const [movements, setMovements] = useState<FinanceMovement[]>(initialMovements);
+  const [movements, setMovements] = useState<FinanceMovement[]>([]);
   const [team, setTeam] = useState<string[]>([]);
   const [ready, setReady] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const skipNextSave = useRef(true);
+
+  const persist = useCallback(
+    async (nextMovements: FinanceMovement[], nextTeam: string[]) => {
+      setSyncing(true);
+      try {
+        await fetch("/api/store", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            movements: nextMovements,
+            team: nextTeam,
+          }),
+        });
+      } catch (error) {
+        console.error(error);
+      } finally {
+        setSyncing(false);
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
-    setMovements(loadMovements());
-    setTeam(loadTeam());
-    setReady(true);
-  }, []);
+    let cancelled = false;
+
+    async function bootstrap() {
+      try {
+        const response = await fetch("/api/store", { cache: "no-store" });
+        if (!response.ok) throw new Error("Falha ao carregar dados");
+        const data = (await response.json()) as {
+          movements?: FinanceMovement[];
+          team?: string[];
+        };
+
+        const remoteMovements = Array.isArray(data.movements) ? data.movements : [];
+        const remoteTeam = Array.isArray(data.team) ? data.team : [];
+        const local = readLocalFallback();
+
+        // Migra dados antigos do computador para o armazenamento compartilhado
+        const shouldMigrate =
+          remoteMovements.length === 0 &&
+          remoteTeam.length === 0 &&
+          (local.movements.length > 0 || local.team.length > 0);
+
+        const nextMovements = shouldMigrate ? local.movements : remoteMovements;
+        const nextTeam = shouldMigrate ? local.team : remoteTeam;
+
+        if (!cancelled) {
+          skipNextSave.current = !shouldMigrate;
+          setMovements(nextMovements);
+          setTeam(nextTeam);
+          setReady(true);
+        }
+
+        if (shouldMigrate) {
+          await persist(nextMovements, nextTeam);
+          clearLocalFallback();
+        } else if (local.movements.length > 0 || local.team.length > 0) {
+          clearLocalFallback();
+        }
+      } catch {
+        const local = readLocalFallback();
+        if (!cancelled) {
+          skipNextSave.current = true;
+          setMovements(local.movements);
+          setTeam(local.team);
+          setReady(true);
+        }
+      }
+    }
+
+    void bootstrap();
+    return () => {
+      cancelled = true;
+    };
+  }, [persist]);
 
   useEffect(() => {
     if (!ready) return;
-    window.localStorage.setItem(MOVEMENTS_KEY, JSON.stringify(movements));
-  }, [movements, ready]);
-
-  useEffect(() => {
-    if (!ready) return;
-    window.localStorage.setItem(TEAM_KEY, JSON.stringify(team));
-  }, [team, ready]);
+    if (skipNextSave.current) {
+      skipNextSave.current = false;
+      return;
+    }
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      void persist(movements, team);
+    }, 350);
+    return () => {
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+    };
+  }, [movements, team, ready, persist]);
 
   const addMovement = useCallback((movement: FinanceMovement) => {
     setMovements((prev) => [movement, ...prev]);
@@ -84,9 +163,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     (name: string) => {
       const cleaned = name.trim().replace(/\s+/g, " ");
       if (!cleaned) return false;
-      if (
-        team.some((item) => item.toLowerCase() === cleaned.toLowerCase())
-      ) {
+      if (team.some((item) => item.toLowerCase() === cleaned.toLowerCase())) {
         return false;
       }
       setTeam((prev) =>
@@ -110,6 +187,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       addResponsible,
       removeResponsible,
       ready,
+      syncing,
     }),
     [
       movements,
@@ -119,6 +197,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       addResponsible,
       removeResponsible,
       ready,
+      syncing,
     ],
   );
 

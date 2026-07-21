@@ -90,23 +90,23 @@ function StatCard({
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, delay }}
-      className="group rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
+      className="group rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md sm:p-5"
     >
-      <div className="flex items-start justify-between">
-        <p className="text-sm text-slate-500">{label}</p>
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-xs text-slate-500 sm:text-sm">{label}</p>
         <span
           className={cn(
-            "grid size-10 place-items-center rounded-xl transition group-hover:scale-105",
+            "grid size-8 place-items-center rounded-xl transition group-hover:scale-105 sm:size-10",
             accent,
           )}
         >
-          <Icon className="size-4" />
+          <Icon className="size-3.5 sm:size-4" />
         </span>
       </div>
-      <p className="mt-5 text-2xl font-semibold tracking-[-0.04em] text-slate-900">
+      <p className="mt-3 text-lg font-semibold tracking-[-0.04em] text-slate-900 sm:mt-5 sm:text-2xl">
         {value}
       </p>
-      {hint ? <p className="mt-1 text-xs text-slate-400">{hint}</p> : null}
+      {hint ? <p className="mt-1 text-[11px] text-slate-400 sm:text-xs">{hint}</p> : null}
     </motion.div>
   );
 }
@@ -143,7 +143,8 @@ function PaymentBadge({ method }: { method: PaymentMethod }) {
 
 export function FinanceDashboard() {
   const today = getToday();
-  const { movements, addMovement, removeMovement, team } = useFinance();
+  const { movements, addMovement, removeMovement, team, ready, syncing } =
+    useFinance();
   const [filter, setFilter] = useState<DateFilter>("hoje");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
@@ -262,18 +263,25 @@ export function FinanceDashboard() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between sm:gap-4">
         <div>
-          <h2 className="text-2xl font-semibold tracking-[-0.04em] text-slate-900">
+          <h2 className="hidden text-2xl font-semibold tracking-[-0.04em] text-slate-900 lg:block">
             Financeiro
           </h2>
-          <p className="mt-1 text-sm capitalize text-slate-500">
-            {formatLongDate(today)} · Controle de caixa da clínica
+          <p className="text-sm capitalize text-slate-500 lg:mt-1">
+            {formatLongDate(today)}
+            <span className="hidden sm:inline"> · Controle de caixa da clínica</span>
           </p>
+          {!ready ? (
+            <p className="mt-1 text-xs text-slate-400">Carregando dados…</p>
+          ) : syncing ? (
+            <p className="mt-1 text-xs text-blue-600">Sincronizando…</p>
+          ) : null}
         </div>
         <Button
           type="button"
+          className="w-full sm:w-auto"
           onClick={() => {
             setForm(emptyForm());
             setModalOpen(true);
@@ -284,7 +292,7 @@ export function FinanceDashboard() {
         </Button>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4 xl:gap-4">
         <StatCard
           label="Entradas do Dia"
           value={formatCurrency(entradasHoje)}
@@ -304,13 +312,13 @@ export function FinanceDashboard() {
         <StatCard
           label="Saldo Atual"
           value={formatCurrency(saldoAtual)}
-          hint="Entradas − saídas (período total)"
+          hint="Entradas − saídas"
           icon={TrendingUp}
           accent="bg-blue-50 text-blue-600"
           delay={0.1}
         />
         <StatCard
-          label="Movimentações do Dia"
+          label="Movimentações"
           value={String(todayMovements.length)}
           hint="Registros de hoje"
           icon={CalendarDays}
@@ -319,18 +327,18 @@ export function FinanceDashboard() {
         />
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_280px]">
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_280px] xl:gap-6">
         <div className="min-w-0 space-y-4">
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
             <div className="flex flex-col gap-3">
-              <div className="flex flex-wrap gap-1.5">
+              <div className="flex gap-1.5 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 {DATE_FILTERS.map((f) => (
                   <button
                     key={f.id}
                     type="button"
                     onClick={() => setFilter(f.id)}
                     className={cn(
-                      "rounded-xl px-3.5 py-2 text-xs font-semibold transition",
+                      "shrink-0 rounded-xl px-3 py-2 text-xs font-semibold transition",
                       filter === f.id
                         ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20"
                         : "bg-slate-50 text-slate-600 hover:bg-slate-100",
@@ -342,14 +350,14 @@ export function FinanceDashboard() {
               </div>
 
               {filter === "personalizado" ? (
-                <div className="flex flex-wrap items-end gap-3">
+                <div className="grid grid-cols-2 gap-3">
                   <div className="grid gap-1.5">
                     <Label className="text-xs text-slate-500">De</Label>
                     <Input
                       type="date"
                       value={customFrom}
                       onChange={(e) => setCustomFrom(e.target.value)}
-                      className="h-9 w-[160px]"
+                      className="h-9"
                     />
                   </div>
                   <div className="grid gap-1.5">
@@ -358,28 +366,28 @@ export function FinanceDashboard() {
                       type="date"
                       value={customTo}
                       onChange={(e) => setCustomTo(e.target.value)}
-                      className="h-9 w-[160px]"
+                      className="h-9"
                     />
                   </div>
                 </div>
               ) : null}
 
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+              <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:gap-3">
                 <div className="relative min-w-0 flex-1">
                   <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
                   <Input
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Buscar por nome, descrição, responsável…"
+                    placeholder="Buscar…"
                     className="pl-9"
                   />
                 </div>
-                <div className="flex flex-wrap gap-2">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                   <Select
                     value={typeFilter}
                     onValueChange={(v) => setTypeFilter(v as "todos" | MovementType)}
                   >
-                    <SelectTrigger className="w-[140px]">
+                    <SelectTrigger className="w-full">
                       <SelectValue placeholder="Tipo" />
                     </SelectTrigger>
                     <SelectContent>
@@ -394,7 +402,7 @@ export function FinanceDashboard() {
                       setMethodFilter(v as "todos" | PaymentMethod)
                     }
                   >
-                    <SelectTrigger className="w-[180px]">
+                    <SelectTrigger className="w-full">
                       <SelectValue placeholder="Pagamento" />
                     </SelectTrigger>
                     <SelectContent>
@@ -411,7 +419,7 @@ export function FinanceDashboard() {
                     value={responsibleFilter}
                     onValueChange={setResponsibleFilter}
                   >
-                    <SelectTrigger className="w-[180px]">
+                    <SelectTrigger className="w-full">
                       <SelectValue placeholder="Quem recebeu" />
                     </SelectTrigger>
                     <SelectContent>
@@ -434,7 +442,65 @@ export function FinanceDashboard() {
             </div>
           </div>
 
-          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="space-y-3 md:hidden">
+            {filtered.length === 0 ? (
+              <div className="rounded-2xl border border-slate-200 bg-white px-4 py-12 text-center text-sm text-slate-400 shadow-sm">
+                Nenhuma movimentação encontrada para os filtros selecionados.
+              </div>
+            ) : (
+              filtered.map((m) => (
+                <div
+                  key={m.id}
+                  className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <TypeBadge type={m.type} />
+                        <PaymentBadge method={m.paymentMethod} />
+                      </div>
+                      <p className="mt-2 truncate font-semibold text-slate-900">
+                        {m.personName}
+                      </p>
+                      <p className="truncate text-sm text-slate-500">{m.description}</p>
+                    </div>
+                    <p
+                      className={cn(
+                        "shrink-0 text-sm font-semibold tabular-nums",
+                        m.type === "entrada" ? "text-emerald-600" : "text-rose-600",
+                      )}
+                    >
+                      {m.type === "entrada" ? "+" : "−"}
+                      {formatCurrency(m.amount)}
+                    </p>
+                  </div>
+                  <div className="mt-3 flex items-center justify-between gap-3 border-t border-slate-100 pt-3">
+                    <div className="min-w-0 text-xs text-slate-400">
+                      <p>
+                        {formatDateBR(m.date)} · {m.time}
+                      </p>
+                      <p className="truncate">Quem recebeu: {m.responsible}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleDelete(
+                          m.id,
+                          `${m.type === "entrada" ? "Entrada" : "Saída"} · ${m.personName} · ${formatCurrency(m.amount)}`,
+                        )
+                      }
+                      className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-rose-600 hover:bg-rose-50"
+                    >
+                      <Trash2 className="size-3.5" />
+                      Apagar
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          <div className="hidden overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm md:block">
             <div className="overflow-x-auto">
               <table className="w-full min-w-[960px] text-left text-sm">
                 <thead>
@@ -538,7 +604,7 @@ export function FinanceDashboard() {
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.35, delay: 0.2 }}
-          className="h-fit rounded-2xl border border-slate-200 bg-white p-5 shadow-sm xl:sticky xl:top-6"
+          className="h-fit rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 xl:sticky xl:top-6"
         >
           <div className="flex items-center gap-2">
             <span className="grid size-9 place-items-center rounded-xl bg-blue-50 text-blue-600">
