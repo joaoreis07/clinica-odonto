@@ -399,9 +399,13 @@ export function FinanceDashboard() {
                       ))}
                     </SelectContent>
                   </Select>
-                  <Select value={responsibleFilter} onValueChange={setResponsibleFilter}>
-                    <SelectTrigger className="w-[160px]">
-                      <SelectValue placeholder="Responsável" />
+                  <Select
+                    key={`filter-team-${team.join("|")}`}
+                    value={responsibleFilter}
+                    onValueChange={setResponsibleFilter}
+                  >
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder="Quem recebeu" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="todos">Todos</SelectItem>
@@ -436,7 +440,7 @@ export function FinanceDashboard() {
                       "Descrição",
                       "Pagamento",
                       "Valor",
-                      "Responsável",
+                      "Quem recebeu",
                       "Observação",
                     ].map((h) => (
                       <th
@@ -691,18 +695,29 @@ export function FinanceDashboard() {
             </div>
 
             <div className="grid gap-2">
-              <Label>Responsável</Label>
+              <Label>
+                {form.type === "entrada" ? "Quem recebeu" : "Quem pagou"}
+              </Label>
               <Select
+                key={`responsible-${team.join("|")}`}
                 value={form.responsible || undefined}
                 onValueChange={(v) => setForm((f) => ({ ...f, responsible: v }))}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Quem registrou" />
+                  <SelectValue
+                    placeholder={
+                      team.length === 0
+                        ? "Cadastre em Configurações"
+                        : form.type === "entrada"
+                          ? "Selecione quem recebeu"
+                          : "Selecione quem pagou"
+                    }
+                  />
                 </SelectTrigger>
                 <SelectContent>
                   {team.length === 0 ? (
                     <SelectItem value="__none" disabled>
-                      Cadastre em Configurações
+                      Cadastre responsáveis em Configurações
                     </SelectItem>
                   ) : (
                     team.map((t) => (
@@ -713,6 +728,11 @@ export function FinanceDashboard() {
                   )}
                 </SelectContent>
               </Select>
+              {team.length === 0 ? (
+                <p className="text-xs text-amber-600">
+                  Nenhum responsável cadastrado. Adicione em Configurações.
+                </p>
+              ) : null}
             </div>
 
             <div className="grid gap-2 sm:grid-cols-2">

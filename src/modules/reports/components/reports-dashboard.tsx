@@ -159,7 +159,7 @@ export function ReportsDashboard() {
                   "Descrição",
                   "Pagamento",
                   "Valor",
-                  "Responsável",
+                  "Quem recebeu",
                 ].map((h) => (
                   <th
                     key={h}

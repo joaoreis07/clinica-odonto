@@ -64,7 +64,7 @@ export function generateDailyReportPdf(
         "Descrição",
         "Pagamento",
         "Valor",
-        "Responsável",
+        "Quem recebeu",
       ],
     ],
     body:
