@@ -32,10 +32,10 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { PAYMENT_METHODS, TEAM, getToday, initialMovements } from "../data";
+import { PAYMENT_METHODS, TEAM, getToday } from "../data";
+import { useFinance } from "../context";
 import type {
   DateFilter,
-  FinanceMovement,
   MovementFormData,
   MovementType,
   PaymentMethod,
@@ -142,7 +142,7 @@ function PaymentBadge({ method }: { method: PaymentMethod }) {
 
 export function FinanceDashboard() {
   const today = getToday();
-  const [movements, setMovements] = useState<FinanceMovement[]>(initialMovements);
+  const { movements, addMovement } = useFinance();
   const [filter, setFilter] = useState<DateFilter>("hoje");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
@@ -238,21 +238,18 @@ export function FinanceDashboard() {
       return;
     }
 
-    setMovements((prev) => [
-      {
-        id: `m-${Date.now()}`,
-        type: form.type,
-        personName: form.personName.trim(),
-        description: form.description.trim(),
-        paymentMethod: form.paymentMethod,
-        responsible: form.responsible,
-        amount,
-        date: form.date,
-        time: form.time,
-        notes: form.notes.trim() || undefined,
-      },
-      ...prev,
-    ]);
+    addMovement({
+      id: `m-${Date.now()}`,
+      type: form.type,
+      personName: form.personName.trim(),
+      description: form.description.trim(),
+      paymentMethod: form.paymentMethod,
+      responsible: form.responsible,
+      amount,
+      date: form.date,
+      time: form.time,
+      notes: form.notes.trim() || undefined,
+    });
     setModalOpen(false);
     setForm(emptyForm());
   }
