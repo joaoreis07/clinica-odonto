@@ -32,14 +32,14 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { PAYMENT_METHODS, TEAM, TODAY, initialMovements } from "./data";
+import { PAYMENT_METHODS, TEAM, TODAY, initialMovements } from "../data";
 import type {
   DateFilter,
   FinanceMovement,
   MovementFormData,
   MovementType,
   PaymentMethod,
-} from "./types";
+} from "../types";
 import {
   formatCurrency,
   formatDateBR,
@@ -47,7 +47,7 @@ import {
   isInFilterRange,
   nowTime,
   paymentBadgeClass,
-} from "./utils";
+} from "../utils";
 
 const DATE_FILTERS: { id: DateFilter; label: string }[] = [
   { id: "hoje", label: "Hoje" },
