@@ -32,7 +32,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { PAYMENT_METHODS, TEAM, getToday } from "../data";
+import { PAYMENT_METHODS, getToday } from "../data";
 import { useFinance } from "../context";
 import type {
   DateFilter,
@@ -142,7 +142,7 @@ function PaymentBadge({ method }: { method: PaymentMethod }) {
 
 export function FinanceDashboard() {
   const today = getToday();
-  const { movements, addMovement } = useFinance();
+  const { movements, addMovement, team } = useFinance();
   const [filter, setFilter] = useState<DateFilter>("hoje");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
@@ -405,11 +405,17 @@ export function FinanceDashboard() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="todos">Todos</SelectItem>
-                      {TEAM.map((t) => (
-                        <SelectItem key={t} value={t}>
-                          {t}
+                      {team.length === 0 ? (
+                        <SelectItem value="__none" disabled>
+                          Cadastre em Configurações
                         </SelectItem>
-                      ))}
+                      ) : (
+                        team.map((t) => (
+                          <SelectItem key={t} value={t}>
+                            {t}
+                          </SelectItem>
+                        ))
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -694,11 +700,17 @@ export function FinanceDashboard() {
                   <SelectValue placeholder="Quem registrou" />
                 </SelectTrigger>
                 <SelectContent>
-                  {TEAM.map((t) => (
-                    <SelectItem key={t} value={t}>
-                      {t}
+                  {team.length === 0 ? (
+                    <SelectItem value="__none" disabled>
+                      Cadastre em Configurações
                     </SelectItem>
-                  ))}
+                  ) : (
+                    team.map((t) => (
+                      <SelectItem key={t} value={t}>
+                        {t}
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             </div>

@@ -17,13 +17,7 @@ export const PAYMENT_METHODS: PaymentMethod[] = [
   "Transferência",
 ];
 
-export const TEAM = [
-  "Ana Paula",
-  "Carla Mendes",
-  "Fernanda Lima",
-  "Juliana Costa",
-  "Roberto Alves",
-];
+export const TEAM: string[] = [];
 
 /** Caixa inicia vazio — sem movimentações de demonstração */
 export const initialMovements: FinanceMovement[] = [];
