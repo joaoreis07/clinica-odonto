@@ -8,6 +8,7 @@ import {
   CalendarDays,
   Plus,
   Search,
+  Trash2,
   TrendingUp,
   Wallet,
 } from "lucide-react";
@@ -142,7 +143,7 @@ function PaymentBadge({ method }: { method: PaymentMethod }) {
 
 export function FinanceDashboard() {
   const today = getToday();
-  const { movements, addMovement, team } = useFinance();
+  const { movements, addMovement, removeMovement, team } = useFinance();
   const [filter, setFilter] = useState<DateFilter>("hoje");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
@@ -223,6 +224,12 @@ export function FinanceDashboard() {
   const totalSaidas = summaryExits.reduce((s, m) => s + m.amount, 0);
   const saldoFiltrado = totalEntradas - totalSaidas;
   const lastMovement = filtered[0];
+
+  function handleDelete(id: string, label: string) {
+    const ok = window.confirm(`Apagar esta movimentação?\n\n${label}`);
+    if (!ok) return;
+    removeMovement(id);
+  }
 
   function saveMovement() {
     const amount = Number(form.amount.replace(",", ".").replace(/[^\d.]/g, ""));
@@ -442,6 +449,7 @@ export function FinanceDashboard() {
                       "Valor",
                       "Quem recebeu",
                       "Observação",
+                      "Ação",
                     ].map((h) => (
                       <th
                         key={h}
@@ -455,7 +463,10 @@ export function FinanceDashboard() {
                 <tbody>
                   {filtered.length === 0 ? (
                     <tr>
-                      <td colSpan={9} className="px-4 py-16 text-center text-sm text-slate-400">
+                      <td
+                        colSpan={10}
+                        className="px-4 py-16 text-center text-sm text-slate-400"
+                      >
                         Nenhuma movimentação encontrada para os filtros selecionados.
                       </td>
                     </tr>
@@ -497,6 +508,22 @@ export function FinanceDashboard() {
                         </td>
                         <td className="max-w-[140px] truncate px-4 py-3.5 text-slate-400">
                           {m.notes || "—"}
+                        </td>
+                        <td className="px-4 py-3.5">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleDelete(
+                                m.id,
+                                `${m.type === "entrada" ? "Entrada" : "Saída"} · ${m.personName} · ${formatCurrency(m.amount)}`,
+                              )
+                            }
+                            className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-rose-600 transition hover:bg-rose-50"
+                            title="Apagar movimentação"
+                          >
+                            <Trash2 className="size-3.5" />
+                            Apagar
+                          </button>
                         </td>
                       </tr>
                     ))

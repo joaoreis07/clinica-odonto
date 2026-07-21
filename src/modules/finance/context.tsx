@@ -18,6 +18,7 @@ const TEAM_KEY = "clinica-odonto-team";
 type FinanceContextValue = {
   movements: FinanceMovement[];
   addMovement: (movement: FinanceMovement) => void;
+  removeMovement: (id: string) => void;
   team: string[];
   addResponsible: (name: string) => boolean;
   removeResponsible: (name: string) => void;
@@ -75,6 +76,10 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     setMovements((prev) => [movement, ...prev]);
   }, []);
 
+  const removeMovement = useCallback((id: string) => {
+    setMovements((prev) => prev.filter((item) => item.id !== id));
+  }, []);
+
   const addResponsible = useCallback(
     (name: string) => {
       const cleaned = name.trim().replace(/\s+/g, " ");
@@ -100,12 +105,21 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     () => ({
       movements,
       addMovement,
+      removeMovement,
       team,
       addResponsible,
       removeResponsible,
       ready,
     }),
-    [movements, addMovement, team, addResponsible, removeResponsible, ready],
+    [
+      movements,
+      addMovement,
+      removeMovement,
+      team,
+      addResponsible,
+      removeResponsible,
+      ready,
+    ],
   );
 
   return (
