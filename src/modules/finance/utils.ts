@@ -11,7 +11,7 @@ import {
 } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import type { DateFilter, PaymentMethod } from "./types";
-import { TODAY } from "./data";
+import { getToday } from "./data";
 
 export function formatCurrency(value: number): string {
   return new Intl.NumberFormat("pt-BR", {
@@ -44,7 +44,7 @@ export function getFilterRange(
   customFrom?: string,
   customTo?: string,
 ): { from: Date; to: Date } | null {
-  const today = parseISO(TODAY);
+  const today = parseISO(getToday());
 
   switch (filter) {
     case "hoje":

@@ -32,7 +32,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { PAYMENT_METHODS, TEAM, TODAY, initialMovements } from "../data";
+import { PAYMENT_METHODS, TEAM, getToday, initialMovements } from "../data";
 import type {
   DateFilter,
   FinanceMovement,
@@ -64,7 +64,7 @@ const emptyForm = (): MovementFormData => ({
   amount: "",
   paymentMethod: "PIX",
   responsible: "",
-  date: TODAY,
+  date: getToday(),
   time: nowTime(),
   notes: "",
 });
@@ -141,6 +141,7 @@ function PaymentBadge({ method }: { method: PaymentMethod }) {
 }
 
 export function FinanceDashboard() {
+  const today = getToday();
   const [movements, setMovements] = useState<FinanceMovement[]>(initialMovements);
   const [filter, setFilter] = useState<DateFilter>("hoje");
   const [customFrom, setCustomFrom] = useState("");
@@ -153,8 +154,8 @@ export function FinanceDashboard() {
   const [form, setForm] = useState<MovementFormData>(emptyForm);
 
   const todayMovements = useMemo(
-    () => movements.filter((m) => m.date === TODAY),
-    [movements],
+    () => movements.filter((m) => m.date === today),
+    [movements, today],
   );
 
   const entradasHoje = useMemo(
@@ -264,7 +265,7 @@ export function FinanceDashboard() {
             Financeiro
           </h2>
           <p className="mt-1 text-sm capitalize text-slate-500">
-            {formatLongDate(TODAY)} · Controle de caixa da clínica
+            {formatLongDate(today)} · Controle de caixa da clínica
           </p>
         </div>
         <Button
