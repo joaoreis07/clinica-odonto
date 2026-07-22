@@ -11,9 +11,21 @@ import {
   type ReactNode,
 } from "react";
 import type { FinanceMovement } from "./types";
+import {
+  DEFAULT_BUDGET_META,
+  type BudgetClosing,
+  type BudgetMeta,
+} from "@/modules/budgets/types";
 
 const LOCAL_MOVEMENTS_KEY = "clinica-odonto-movements";
 const LOCAL_TEAM_KEY = "clinica-odonto-team";
+
+type StoreSnapshot = {
+  movements: FinanceMovement[];
+  team: string[];
+  budgetClosings: BudgetClosing[];
+  budgetMeta: BudgetMeta;
+};
 
 type FinanceContextValue = {
   movements: FinanceMovement[];
@@ -22,13 +34,18 @@ type FinanceContextValue = {
   team: string[];
   addResponsible: (name: string) => boolean;
   removeResponsible: (name: string) => void;
+  budgetClosings: BudgetClosing[];
+  addBudgetClosing: (closing: BudgetClosing) => void;
+  removeBudgetClosing: (id: string) => void;
+  budgetMeta: BudgetMeta;
+  updateBudgetMeta: (meta: BudgetMeta) => void;
   ready: boolean;
   syncing: boolean;
 };
 
 const FinanceContext = createContext<FinanceContextValue | null>(null);
 
-function readLocalFallback(): { movements: FinanceMovement[]; team: string[] } {
+function readLocalFallback(): Pick<StoreSnapshot, "movements" | "team"> {
   if (typeof window === "undefined") return { movements: [], team: [] };
   try {
     const movementsRaw = window.localStorage.getItem(LOCAL_MOVEMENTS_KEY);
@@ -55,31 +72,27 @@ function clearLocalFallback() {
 export function FinanceProvider({ children }: { children: ReactNode }) {
   const [movements, setMovements] = useState<FinanceMovement[]>([]);
   const [team, setTeam] = useState<string[]>([]);
+  const [budgetClosings, setBudgetClosings] = useState<BudgetClosing[]>([]);
+  const [budgetMeta, setBudgetMeta] = useState<BudgetMeta>(DEFAULT_BUDGET_META);
   const [ready, setReady] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const skipNextSave = useRef(true);
 
-  const persist = useCallback(
-    async (nextMovements: FinanceMovement[], nextTeam: string[]) => {
-      setSyncing(true);
-      try {
-        await fetch("/api/store", {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            movements: nextMovements,
-            team: nextTeam,
-          }),
-        });
-      } catch (error) {
-        console.error(error);
-      } finally {
-        setSyncing(false);
-      }
-    },
-    [],
-  );
+  const persist = useCallback(async (snapshot: StoreSnapshot) => {
+    setSyncing(true);
+    try {
+      await fetch("/api/store", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(snapshot),
+      });
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setSyncing(false);
+    }
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -88,33 +101,48 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       try {
         const response = await fetch("/api/store", { cache: "no-store" });
         if (!response.ok) throw new Error("Falha ao carregar dados");
-        const data = (await response.json()) as {
-          movements?: FinanceMovement[];
-          team?: string[];
-        };
+        const data = (await response.json()) as Partial<StoreSnapshot>;
 
         const remoteMovements = Array.isArray(data.movements) ? data.movements : [];
         const remoteTeam = Array.isArray(data.team) ? data.team : [];
+        const remoteClosings = Array.isArray(data.budgetClosings)
+          ? data.budgetClosings
+          : [];
+        const remoteMeta = data.budgetMeta ?? DEFAULT_BUDGET_META;
         const local = readLocalFallback();
 
-        // Migra dados antigos do computador para o armazenamento compartilhado
         const shouldMigrate =
           remoteMovements.length === 0 &&
           remoteTeam.length === 0 &&
           (local.movements.length > 0 || local.team.length > 0);
 
-        const nextMovements = shouldMigrate ? local.movements : remoteMovements;
-        const nextTeam = shouldMigrate ? local.team : remoteTeam;
+        const next: StoreSnapshot = {
+          movements: shouldMigrate ? local.movements : remoteMovements,
+          team: shouldMigrate ? local.team : remoteTeam,
+          budgetClosings: remoteClosings,
+          budgetMeta: {
+            targetCount:
+              Number(remoteMeta.targetCount) > 0
+                ? Math.floor(Number(remoteMeta.targetCount))
+                : DEFAULT_BUDGET_META.targetCount,
+            bonusAmount:
+              Number(remoteMeta.bonusAmount) >= 0
+                ? Number(remoteMeta.bonusAmount)
+                : 0,
+          },
+        };
 
         if (!cancelled) {
           skipNextSave.current = !shouldMigrate;
-          setMovements(nextMovements);
-          setTeam(nextTeam);
+          setMovements(next.movements);
+          setTeam(next.team);
+          setBudgetClosings(next.budgetClosings);
+          setBudgetMeta(next.budgetMeta);
           setReady(true);
         }
 
         if (shouldMigrate) {
-          await persist(nextMovements, nextTeam);
+          await persist(next);
           clearLocalFallback();
         } else if (local.movements.length > 0 || local.team.length > 0) {
           clearLocalFallback();
@@ -125,6 +153,8 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
           skipNextSave.current = true;
           setMovements(local.movements);
           setTeam(local.team);
+          setBudgetClosings([]);
+          setBudgetMeta(DEFAULT_BUDGET_META);
           setReady(true);
         }
       }
@@ -144,12 +174,12 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     }
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
-      void persist(movements, team);
+      void persist({ movements, team, budgetClosings, budgetMeta });
     }, 350);
     return () => {
       if (saveTimer.current) clearTimeout(saveTimer.current);
     };
-  }, [movements, team, ready, persist]);
+  }, [movements, team, budgetClosings, budgetMeta, ready, persist]);
 
   const addMovement = useCallback((movement: FinanceMovement) => {
     setMovements((prev) => [movement, ...prev]);
@@ -178,6 +208,21 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     setTeam((prev) => prev.filter((item) => item !== name));
   }, []);
 
+  const addBudgetClosing = useCallback((closing: BudgetClosing) => {
+    setBudgetClosings((prev) => [closing, ...prev]);
+  }, []);
+
+  const removeBudgetClosing = useCallback((id: string) => {
+    setBudgetClosings((prev) => prev.filter((item) => item.id !== id));
+  }, []);
+
+  const updateBudgetMeta = useCallback((meta: BudgetMeta) => {
+    setBudgetMeta({
+      targetCount: Math.max(1, Math.floor(meta.targetCount || 1)),
+      bonusAmount: Math.max(0, Number(meta.bonusAmount) || 0),
+    });
+  }, []);
+
   const value = useMemo(
     () => ({
       movements,
@@ -186,6 +231,11 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       team,
       addResponsible,
       removeResponsible,
+      budgetClosings,
+      addBudgetClosing,
+      removeBudgetClosing,
+      budgetMeta,
+      updateBudgetMeta,
       ready,
       syncing,
     }),
@@ -196,6 +246,11 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       team,
       addResponsible,
       removeResponsible,
+      budgetClosings,
+      addBudgetClosing,
+      removeBudgetClosing,
+      budgetMeta,
+      updateBudgetMeta,
       ready,
       syncing,
     ],

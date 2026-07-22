@@ -1,19 +1,43 @@
 import { get, put } from "@vercel/blob";
 import type { FinanceMovement } from "@/modules/finance/types";
+import {
+  DEFAULT_BUDGET_META,
+  type BudgetClosing,
+  type BudgetMeta,
+} from "@/modules/budgets/types";
 
 export type ClinicStore = {
   movements: FinanceMovement[];
   team: string[];
+  budgetClosings: BudgetClosing[];
+  budgetMeta: BudgetMeta;
   updatedAt: string;
 };
 
 export const EMPTY_STORE: ClinicStore = {
   movements: [],
   team: [],
+  budgetClosings: [],
+  budgetMeta: DEFAULT_BUDGET_META,
   updatedAt: new Date(0).toISOString(),
 };
 
 const BLOB_PATHNAME = "clinic-store.json";
+
+function normalizeMeta(meta: unknown): BudgetMeta {
+  if (!meta || typeof meta !== "object") return DEFAULT_BUDGET_META;
+  const parsed = meta as Partial<BudgetMeta>;
+  const targetCount = Number(parsed.targetCount);
+  const bonusAmount = Number(parsed.bonusAmount);
+  return {
+    targetCount:
+      Number.isFinite(targetCount) && targetCount > 0
+        ? Math.floor(targetCount)
+        : DEFAULT_BUDGET_META.targetCount,
+    bonusAmount:
+      Number.isFinite(bonusAmount) && bonusAmount >= 0 ? bonusAmount : 0,
+  };
+}
 
 function normalizeStore(data: unknown): ClinicStore {
   if (!data || typeof data !== "object") return EMPTY_STORE;
@@ -21,6 +45,10 @@ function normalizeStore(data: unknown): ClinicStore {
   return {
     movements: Array.isArray(parsed.movements) ? parsed.movements : [],
     team: Array.isArray(parsed.team) ? parsed.team : [],
+    budgetClosings: Array.isArray(parsed.budgetClosings)
+      ? parsed.budgetClosings
+      : [],
+    budgetMeta: normalizeMeta(parsed.budgetMeta),
     updatedAt:
       typeof parsed.updatedAt === "string"
         ? parsed.updatedAt
@@ -48,6 +76,8 @@ export async function writeClinicStore(
   const next: ClinicStore = {
     movements: store.movements,
     team: store.team,
+    budgetClosings: store.budgetClosings,
+    budgetMeta: normalizeMeta(store.budgetMeta),
     updatedAt: new Date().toISOString(),
   };
 

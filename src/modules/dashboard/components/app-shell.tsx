@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { FileBarChart2, Settings, Wallet } from "lucide-react";
+import { ClipboardCheck, FileBarChart2, Settings, Wallet } from "lucide-react";
+import { BudgetsDashboard } from "@/modules/budgets/components/budgets-dashboard";
 import { FinanceDashboard } from "@/modules/finance/components/finance-dashboard";
 import { FinanceProvider } from "@/modules/finance/context";
 import { ReportsDashboard } from "@/modules/reports/components/reports-dashboard";
@@ -11,6 +12,7 @@ import { cn } from "@/lib/utils";
 
 const NAV = [
   { icon: Wallet, label: "Financeiro" },
+  { icon: ClipboardCheck, label: "Orçamentos" },
   { icon: FileBarChart2, label: "Relatórios" },
   { icon: Settings, label: "Configurações" },
 ] as const;
@@ -91,6 +93,8 @@ export function AppShell() {
           <main className="mx-auto max-w-7xl p-4 sm:p-5 lg:p-9">
             {active === "Financeiro" ? (
               <FinanceDashboard />
+            ) : active === "Orçamentos" ? (
+              <BudgetsDashboard />
             ) : active === "Relatórios" ? (
               <ReportsDashboard />
             ) : (
@@ -99,15 +103,15 @@ export function AppShell() {
           </main>
         </div>
 
-        <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur lg:hidden">
-          <div className="mx-auto grid max-w-lg grid-cols-3 gap-1">
+        <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 px-1.5 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur lg:hidden">
+          <div className="mx-auto grid max-w-lg grid-cols-4 gap-1">
             {NAV.map(({ icon: Icon, label }) => (
               <button
                 key={label}
                 type="button"
                 onClick={() => setActive(label)}
                 className={cn(
-                  "flex flex-col items-center gap-1 rounded-xl px-2 py-2 text-[11px] font-semibold transition",
+                  "flex flex-col items-center gap-1 rounded-xl px-1 py-2 text-[10px] font-semibold transition sm:text-[11px]",
                   active === label
                     ? "bg-blue-50 text-blue-700"
                     : "text-slate-500",

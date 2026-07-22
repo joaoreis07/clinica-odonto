@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { readClinicStore, writeClinicStore } from "@/lib/clinic-store";
 import type { FinanceMovement } from "@/modules/finance/types";
+import type { BudgetClosing, BudgetMeta } from "@/modules/budgets/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,11 +16,21 @@ export async function PUT(request: Request) {
     const body = (await request.json()) as {
       movements?: FinanceMovement[];
       team?: string[];
+      budgetClosings?: BudgetClosing[];
+      budgetMeta?: BudgetMeta;
     };
 
+    const current = await readClinicStore();
+
     const store = await writeClinicStore({
-      movements: Array.isArray(body.movements) ? body.movements : [],
-      team: Array.isArray(body.team) ? body.team : [],
+      movements: Array.isArray(body.movements)
+        ? body.movements
+        : current.movements,
+      team: Array.isArray(body.team) ? body.team : current.team,
+      budgetClosings: Array.isArray(body.budgetClosings)
+        ? body.budgetClosings
+        : current.budgetClosings,
+      budgetMeta: body.budgetMeta ?? current.budgetMeta,
     });
 
     return NextResponse.json(store);
