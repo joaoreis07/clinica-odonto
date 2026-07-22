@@ -161,10 +161,10 @@ export function BudgetsDashboard() {
             Orçamentos
           </h2>
           <p className="text-sm text-slate-500 lg:mt-1">
-            Ciclo do dia 20 · {formatCycleLong(cycle)}
+            Ciclo atual: {formatCycleLong(cycle)}
           </p>
           <p className="mt-1 text-xs text-slate-400">
-            {cycle.label}
+            Reinicia todo dia 20
             {!ready
               ? " · Carregando…"
               : syncing

@@ -43,7 +43,7 @@ export function getBudgetCycle(ref: Date = new Date()): CycleRange {
     endExclusive,
     startISO: toISODate(start),
     endISO: toISODate(endInclusive),
-    label: `${format(start, "dd/MM/yyyy")} → ${format(endInclusive, "dd/MM/yyyy")}`,
+    label: `${format(start, "dd/MM/yyyy")} → ${format(endExclusive, "dd/MM/yyyy")}`,
   };
 }
 
@@ -74,8 +74,8 @@ export function daysLeftInCycle(cycle: CycleRange, ref: Date = new Date()): numb
 }
 
 export function formatCycleLong(cycle: CycleRange): string {
-  return `${format(cycle.start, "d 'de' MMMM", { locale: ptBR })} até ${format(
-    parseISO(cycle.endISO),
+  return `${format(cycle.start, "d 'de' MMMM", { locale: ptBR })} → ${format(
+    cycle.endExclusive,
     "d 'de' MMMM",
     { locale: ptBR },
   )}`;
