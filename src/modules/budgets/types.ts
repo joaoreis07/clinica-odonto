@@ -9,13 +9,13 @@ export interface BudgetClosing {
 }
 
 export interface BudgetMeta {
-  /** Quantidade de orçamentos fechados no ciclo */
-  targetCount: number;
+  /** Meta de faturamento do ciclo (R$) */
+  targetRevenue: number;
   /** Valor do bônus se a meta for batida */
   bonusAmount: number;
 }
 
 export const DEFAULT_BUDGET_META: BudgetMeta = {
-  targetCount: 10,
+  targetRevenue: 10000,
   bonusAmount: 0,
 };

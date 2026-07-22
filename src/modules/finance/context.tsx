@@ -121,10 +121,10 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
           team: shouldMigrate ? local.team : remoteTeam,
           budgetClosings: remoteClosings,
           budgetMeta: {
-            targetCount:
-              Number(remoteMeta.targetCount) > 0
-                ? Math.floor(Number(remoteMeta.targetCount))
-                : DEFAULT_BUDGET_META.targetCount,
+            targetRevenue:
+              Number(remoteMeta.targetRevenue) > 0
+                ? Number(remoteMeta.targetRevenue)
+                : DEFAULT_BUDGET_META.targetRevenue,
             bonusAmount:
               Number(remoteMeta.bonusAmount) >= 0
                 ? Number(remoteMeta.bonusAmount)
@@ -218,7 +218,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
 
   const updateBudgetMeta = useCallback((meta: BudgetMeta) => {
     setBudgetMeta({
-      targetCount: Math.max(1, Math.floor(meta.targetCount || 1)),
+      targetRevenue: Math.max(0.01, Number(meta.targetRevenue) || 0.01),
       bonusAmount: Math.max(0, Number(meta.bonusAmount) || 0),
     });
   }, []);

@@ -79,37 +79,41 @@ export function BudgetsDashboard() {
   );
 
   const totalAmount = cycleClosings.reduce((sum, item) => sum + item.amount, 0);
+  const targetRevenue = Math.max(budgetMeta.targetRevenue, 0.01);
   const progress = Math.min(
     100,
-    Math.round((cycleClosings.length / Math.max(budgetMeta.targetCount, 1)) * 100),
+    Math.round((totalAmount / targetRevenue) * 100),
   );
-  const metaHit = cycleClosings.length >= budgetMeta.targetCount;
+  const metaHit = totalAmount >= budgetMeta.targetRevenue;
+  const remainingRevenue = Math.max(budgetMeta.targetRevenue - totalAmount, 0);
   const daysLeft = daysLeftInCycle(cycle);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [metaOpen, setMetaOpen] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [metaForm, setMetaForm] = useState({
-    targetCount: String(budgetMeta.targetCount),
+    targetRevenue: String(budgetMeta.targetRevenue || ""),
     bonusAmount: String(budgetMeta.bonusAmount || ""),
   });
 
   function openMeta() {
     setMetaForm({
-      targetCount: String(budgetMeta.targetCount),
+      targetRevenue: String(budgetMeta.targetRevenue || ""),
       bonusAmount: String(budgetMeta.bonusAmount || ""),
     });
     setMetaOpen(true);
   }
 
   function saveMeta() {
-    const targetCount = Number(metaForm.targetCount.replace(/\D/g, ""));
+    const targetRevenueValue = Number(
+      metaForm.targetRevenue.replace(",", ".").replace(/[^\d.]/g, ""),
+    );
     const bonusAmount = Number(
       metaForm.bonusAmount.replace(",", ".").replace(/[^\d.]/g, ""),
     );
-    if (!targetCount || targetCount <= 0) return;
+    if (!targetRevenueValue || targetRevenueValue <= 0) return;
     updateBudgetMeta({
-      targetCount,
+      targetRevenue: targetRevenueValue,
       bonusAmount: Number.isFinite(bonusAmount) ? bonusAmount : 0,
     });
     setMetaOpen(false);
@@ -201,21 +205,21 @@ export function BudgetsDashboard() {
           {
             label: "Fechados no ciclo",
             value: String(cycleClosings.length),
-            hint: `Meta: ${budgetMeta.targetCount}`,
+            hint: "Orçamentos registrados",
             icon: Users,
             accent: "bg-blue-50 text-blue-600",
           },
           {
-            label: "Valor total",
+            label: "Faturamento",
             value: formatCurrency(totalAmount),
-            hint: "Soma dos orçamentos",
+            hint: `Meta: ${formatCurrency(budgetMeta.targetRevenue)}`,
             icon: Wallet,
             accent: "bg-emerald-50 text-emerald-600",
           },
           {
             label: "Meta",
             value: `${progress}%`,
-            hint: `${cycleClosings.length}/${budgetMeta.targetCount} orçamentos`,
+            hint: `${formatCurrency(totalAmount)} / ${formatCurrency(budgetMeta.targetRevenue)}`,
             icon: Target,
             accent: "bg-amber-50 text-amber-600",
           },
@@ -259,7 +263,7 @@ export function BudgetsDashboard() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h3 className="text-sm font-semibold text-slate-900">
-              Progresso da meta
+              Progresso da meta de faturamento
             </h3>
             <p className="mt-1 text-xs text-slate-500">
               Contagem reinicia todo dia 20.
@@ -272,8 +276,7 @@ export function BudgetsDashboard() {
             </span>
           ) : (
             <span className="rounded-xl bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-600">
-              Faltam {Math.max(budgetMeta.targetCount - cycleClosings.length, 0)}{" "}
-              para o bônus
+              Faltam {formatCurrency(remainingRevenue)} para o bônus
             </span>
           )}
         </div>
@@ -528,20 +531,20 @@ export function BudgetsDashboard() {
           <DialogHeader>
             <DialogTitle>Meta e bônus do ciclo</DialogTitle>
             <DialogDescription>
-              Defina quantos orçamentos fechados liberam o bônus no ciclo atual.
+              Defina a meta de faturamento em R$ para liberar o bônus no ciclo.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-1">
             <div className="grid gap-2">
-              <Label htmlFor="targetCount">Meta de orçamentos</Label>
+              <Label htmlFor="targetRevenue">Meta de faturamento (R$)</Label>
               <Input
-                id="targetCount"
-                inputMode="numeric"
-                value={metaForm.targetCount}
+                id="targetRevenue"
+                inputMode="decimal"
+                value={metaForm.targetRevenue}
                 onChange={(e) =>
-                  setMetaForm((f) => ({ ...f, targetCount: e.target.value }))
+                  setMetaForm((f) => ({ ...f, targetRevenue: e.target.value }))
                 }
-                placeholder="Ex.: 10"
+                placeholder="Ex.: 50000"
               />
             </div>
             <div className="grid gap-2">

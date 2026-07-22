@@ -27,13 +27,13 @@ const BLOB_PATHNAME = "clinic-store.json";
 function normalizeMeta(meta: unknown): BudgetMeta {
   if (!meta || typeof meta !== "object") return DEFAULT_BUDGET_META;
   const parsed = meta as Partial<BudgetMeta>;
-  const targetCount = Number(parsed.targetCount);
+  const targetRevenue = Number(parsed.targetRevenue);
   const bonusAmount = Number(parsed.bonusAmount);
   return {
-    targetCount:
-      Number.isFinite(targetCount) && targetCount > 0
-        ? Math.floor(targetCount)
-        : DEFAULT_BUDGET_META.targetCount,
+    targetRevenue:
+      Number.isFinite(targetRevenue) && targetRevenue > 0
+        ? targetRevenue
+        : DEFAULT_BUDGET_META.targetRevenue,
     bonusAmount:
       Number.isFinite(bonusAmount) && bonusAmount >= 0 ? bonusAmount : 0,
   };
