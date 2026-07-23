@@ -38,7 +38,10 @@ import {
   daysLeftInCycle,
   filterCycleClosings,
   formatCycleLong,
+  formatCycleOption,
   getBudgetCycle,
+  isCurrentCycle,
+  listAvailableCycles,
 } from "../cycle";
 import type { BudgetClosing } from "../types";
 
@@ -72,7 +75,23 @@ export function BudgetsDashboard() {
     syncing,
   } = useFinance();
 
-  const cycle = useMemo(() => getBudgetCycle(new Date()), []);
+  const availableCycles = useMemo(
+    () => listAvailableCycles(budgetClosings, new Date()),
+    [budgetClosings],
+  );
+  const currentCycle = useMemo(() => getBudgetCycle(new Date()), []);
+  const [selectedCycleStart, setSelectedCycleStart] = useState(
+    currentCycle.startISO,
+  );
+
+  const cycle = useMemo(() => {
+    return (
+      availableCycles.find((item) => item.startISO === selectedCycleStart) ??
+      currentCycle
+    );
+  }, [availableCycles, selectedCycleStart, currentCycle]);
+
+  const viewingCurrent = isCurrentCycle(cycle);
   const cycleClosings = useMemo(
     () => filterCycleClosings(budgetClosings, cycle),
     [budgetClosings, cycle],
@@ -165,7 +184,8 @@ export function BudgetsDashboard() {
             Orçamentos
           </h2>
           <p className="text-sm text-slate-500 lg:mt-1">
-            Ciclo atual: {formatCycleLong(cycle)}
+            {viewingCurrent ? "Ciclo atual" : "Ciclo selecionado"}:{" "}
+            {formatCycleLong(cycle)}
           </p>
           <p className="mt-1 text-xs text-slate-400">
             Reinicia todo dia 20
@@ -173,7 +193,9 @@ export function BudgetsDashboard() {
               ? " · Carregando…"
               : syncing
                 ? " · Sincronizando…"
-                : ` · ${daysLeft} dia(s) restantes`}
+                : viewingCurrent
+                  ? ` · ${daysLeft} dia(s) restantes`
+                  : " · Ciclo encerrado"}
           </p>
         </div>
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
@@ -197,6 +219,35 @@ export function BudgetsDashboard() {
             <Plus className="size-4" />
             Orçamento fechado
           </Button>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-semibold text-slate-900">Ver ciclo</p>
+            <p className="text-xs text-slate-500">
+              Consulte o atual e os meses anteriores.
+            </p>
+          </div>
+          <Select
+            value={selectedCycleStart}
+            onValueChange={setSelectedCycleStart}
+          >
+            <SelectTrigger className="w-full sm:w-[280px]">
+              <SelectValue placeholder="Selecione o ciclo" />
+            </SelectTrigger>
+            <SelectContent>
+              {availableCycles.map((item) => (
+                <SelectItem key={item.startISO} value={item.startISO}>
+                  {formatCycleOption(item)}
+                  {item.startISO === currentCycle.startISO ? " · atual" : ""}
+                  {" · "}
+                  {item.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
@@ -274,9 +325,13 @@ export function BudgetsDashboard() {
               <Trophy className="size-3.5" />
               Meta batida · Bônus {formatCurrency(budgetMeta.bonusAmount)}
             </span>
-          ) : (
+          ) : viewingCurrent ? (
             <span className="rounded-xl bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-600">
               Faltam {formatCurrency(remainingRevenue)} para o bônus
+            </span>
+          ) : (
+            <span className="rounded-xl bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-600">
+              Ciclo encerrado
             </span>
           )}
         </div>
