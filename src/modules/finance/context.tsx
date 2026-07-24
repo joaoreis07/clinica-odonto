@@ -90,23 +90,79 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   const [budgetMeta, setBudgetMeta] = useState<BudgetMeta>(DEFAULT_BUDGET_META);
   const [ready, setReady] = useState(false);
   const [syncing, setSyncing] = useState(false);
+
+  const snapshotRef = useRef<StoreSnapshot>({
+    movements: [],
+    monthlyPayments: [],
+    team: [],
+    budgetClosings: [],
+    budgetMeta: DEFAULT_BUDGET_META,
+  });
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const skipNextSave = useRef(true);
+  const saveVersion = useRef(0);
+  const writing = useRef(false);
+  const writeAgain = useRef(false);
 
-  const persist = useCallback(async (snapshot: StoreSnapshot) => {
+  const writeLatest = useCallback(async () => {
+    if (writing.current) {
+      writeAgain.current = true;
+      return;
+    }
+
+    writing.current = true;
     setSyncing(true);
     try {
-      await fetch("/api/store", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(snapshot),
-      });
+      do {
+        writeAgain.current = false;
+        const version = saveVersion.current;
+        const snapshot = snapshotRef.current;
+        await fetch("/api/store", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(snapshot),
+        });
+        // Se mudou durante o PUT, grava de novo o estado mais novo
+        if (saveVersion.current !== version) {
+          writeAgain.current = true;
+        }
+      } while (writeAgain.current);
     } catch (error) {
       console.error(error);
     } finally {
+      writing.current = false;
       setSyncing(false);
     }
   }, []);
+
+  const scheduleSave = useCallback(
+    (immediate = false) => {
+      if (skipNextSave.current) {
+        skipNextSave.current = false;
+        return;
+      }
+      saveVersion.current += 1;
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+      if (immediate) {
+        void writeLatest();
+        return;
+      }
+      saveTimer.current = setTimeout(() => {
+        void writeLatest();
+      }, 350);
+    },
+    [writeLatest],
+  );
+
+  useEffect(() => {
+    snapshotRef.current = {
+      movements,
+      monthlyPayments,
+      team,
+      budgetClosings,
+      budgetMeta,
+    };
+  }, [movements, monthlyPayments, team, budgetClosings, budgetMeta]);
 
   useEffect(() => {
     let cancelled = false;
@@ -156,6 +212,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
 
         if (!cancelled) {
           skipNextSave.current = !shouldMigrate;
+          snapshotRef.current = next;
           setMovements(next.movements);
           setMonthlyPayments(next.monthlyPayments);
           setTeam(next.team);
@@ -165,7 +222,11 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
         }
 
         if (shouldMigrate) {
-          await persist(next);
+          await fetch("/api/store", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(next),
+          });
           clearLocalFallback();
         } else if (local.movements.length > 0 || local.team.length > 0) {
           clearLocalFallback();
@@ -174,11 +235,19 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
         const local = readLocalFallback();
         if (!cancelled) {
           skipNextSave.current = true;
-          setMovements(local.movements);
-          setMonthlyPayments([]);
-          setTeam(local.team);
-          setBudgetClosings([]);
-          setBudgetMeta(DEFAULT_BUDGET_META);
+          const next: StoreSnapshot = {
+            movements: local.movements,
+            monthlyPayments: [],
+            team: local.team,
+            budgetClosings: [],
+            budgetMeta: DEFAULT_BUDGET_META,
+          };
+          snapshotRef.current = next;
+          setMovements(next.movements);
+          setMonthlyPayments(next.monthlyPayments);
+          setTeam(next.team);
+          setBudgetClosings(next.budgetClosings);
+          setBudgetMeta(next.budgetMeta);
           setReady(true);
         }
       }
@@ -188,27 +257,11 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [persist]);
+  }, []);
 
   useEffect(() => {
     if (!ready) return;
-    if (skipNextSave.current) {
-      skipNextSave.current = false;
-      return;
-    }
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => {
-      void persist({
-        movements,
-        monthlyPayments,
-        team,
-        budgetClosings,
-        budgetMeta,
-      });
-    }, 350);
-    return () => {
-      if (saveTimer.current) clearTimeout(saveTimer.current);
-    };
+    scheduleSave(false);
   }, [
     movements,
     monthlyPayments,
@@ -216,24 +269,43 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     budgetClosings,
     budgetMeta,
     ready,
-    persist,
+    scheduleSave,
   ]);
 
   const addMovement = useCallback((movement: FinanceMovement) => {
     setMovements((prev) => [movement, ...prev]);
   }, []);
 
-  const removeMovement = useCallback((id: string) => {
-    setMovements((prev) => prev.filter((item) => item.id !== id));
-  }, []);
+  const removeMovement = useCallback(
+    (id: string) => {
+      setMovements((prev) => {
+        const next = prev.filter((item) => item.id !== id);
+        snapshotRef.current = { ...snapshotRef.current, movements: next };
+        return next;
+      });
+      scheduleSave(true);
+    },
+    [scheduleSave],
+  );
 
   const addMonthlyPayment = useCallback((payment: MonthlyPayment) => {
     setMonthlyPayments((prev) => [payment, ...prev]);
   }, []);
 
-  const removeMonthlyPayment = useCallback((id: string) => {
-    setMonthlyPayments((prev) => prev.filter((item) => item.id !== id));
-  }, []);
+  const removeMonthlyPayment = useCallback(
+    (id: string) => {
+      setMonthlyPayments((prev) => {
+        const next = prev.filter((item) => item.id !== id);
+        snapshotRef.current = {
+          ...snapshotRef.current,
+          monthlyPayments: next,
+        };
+        return next;
+      });
+      scheduleSave(true);
+    },
+    [scheduleSave],
+  );
 
   const addResponsible = useCallback(
     (name: string) => {
@@ -275,9 +347,20 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  const removeBudgetClosing = useCallback((id: string) => {
-    setBudgetClosings((prev) => prev.filter((item) => item.id !== id));
-  }, []);
+  const removeBudgetClosing = useCallback(
+    (id: string) => {
+      setBudgetClosings((prev) => {
+        const next = prev.filter((item) => item.id !== id);
+        snapshotRef.current = {
+          ...snapshotRef.current,
+          budgetClosings: next,
+        };
+        return next;
+      });
+      scheduleSave(true);
+    },
+    [scheduleSave],
+  );
 
   const updateBudgetMeta = useCallback((meta: BudgetMeta) => {
     setBudgetMeta({
