@@ -12,6 +12,10 @@ import {
 } from "react";
 import type { FinanceMovement } from "./types";
 import {
+  normalizeMonthlyPayment,
+  type MonthlyPayment,
+} from "./monthly-types";
+import {
   DEFAULT_BUDGET_META,
   normalizeBudgetClosing,
   type BudgetClosing,
@@ -23,6 +27,7 @@ const LOCAL_TEAM_KEY = "clinica-odonto-team";
 
 type StoreSnapshot = {
   movements: FinanceMovement[];
+  monthlyPayments: MonthlyPayment[];
   team: string[];
   budgetClosings: BudgetClosing[];
   budgetMeta: BudgetMeta;
@@ -32,6 +37,9 @@ type FinanceContextValue = {
   movements: FinanceMovement[];
   addMovement: (movement: FinanceMovement) => void;
   removeMovement: (id: string) => void;
+  monthlyPayments: MonthlyPayment[];
+  addMonthlyPayment: (payment: MonthlyPayment) => void;
+  removeMonthlyPayment: (id: string) => void;
   team: string[];
   addResponsible: (name: string) => boolean;
   removeResponsible: (name: string) => void;
@@ -76,6 +84,7 @@ function clearLocalFallback() {
 
 export function FinanceProvider({ children }: { children: ReactNode }) {
   const [movements, setMovements] = useState<FinanceMovement[]>([]);
+  const [monthlyPayments, setMonthlyPayments] = useState<MonthlyPayment[]>([]);
   const [team, setTeam] = useState<string[]>([]);
   const [budgetClosings, setBudgetClosings] = useState<BudgetClosing[]>([]);
   const [budgetMeta, setBudgetMeta] = useState<BudgetMeta>(DEFAULT_BUDGET_META);
@@ -109,6 +118,11 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
         const data = (await response.json()) as Partial<StoreSnapshot>;
 
         const remoteMovements = Array.isArray(data.movements) ? data.movements : [];
+        const remoteMonthly = Array.isArray(data.monthlyPayments)
+          ? data.monthlyPayments
+              .map((item) => normalizeMonthlyPayment(item))
+              .filter((item): item is MonthlyPayment => item !== null)
+          : [];
         const remoteTeam = Array.isArray(data.team) ? data.team : [];
         const remoteClosings = Array.isArray(data.budgetClosings)
           ? data.budgetClosings
@@ -125,6 +139,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
 
         const next: StoreSnapshot = {
           movements: shouldMigrate ? local.movements : remoteMovements,
+          monthlyPayments: remoteMonthly,
           team: shouldMigrate ? local.team : remoteTeam,
           budgetClosings: remoteClosings,
           budgetMeta: {
@@ -142,6 +157,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
         if (!cancelled) {
           skipNextSave.current = !shouldMigrate;
           setMovements(next.movements);
+          setMonthlyPayments(next.monthlyPayments);
           setTeam(next.team);
           setBudgetClosings(next.budgetClosings);
           setBudgetMeta(next.budgetMeta);
@@ -159,6 +175,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
         if (!cancelled) {
           skipNextSave.current = true;
           setMovements(local.movements);
+          setMonthlyPayments([]);
           setTeam(local.team);
           setBudgetClosings([]);
           setBudgetMeta(DEFAULT_BUDGET_META);
@@ -181,12 +198,26 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     }
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
-      void persist({ movements, team, budgetClosings, budgetMeta });
+      void persist({
+        movements,
+        monthlyPayments,
+        team,
+        budgetClosings,
+        budgetMeta,
+      });
     }, 350);
     return () => {
       if (saveTimer.current) clearTimeout(saveTimer.current);
     };
-  }, [movements, team, budgetClosings, budgetMeta, ready, persist]);
+  }, [
+    movements,
+    monthlyPayments,
+    team,
+    budgetClosings,
+    budgetMeta,
+    ready,
+    persist,
+  ]);
 
   const addMovement = useCallback((movement: FinanceMovement) => {
     setMovements((prev) => [movement, ...prev]);
@@ -194,6 +225,14 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
 
   const removeMovement = useCallback((id: string) => {
     setMovements((prev) => prev.filter((item) => item.id !== id));
+  }, []);
+
+  const addMonthlyPayment = useCallback((payment: MonthlyPayment) => {
+    setMonthlyPayments((prev) => [payment, ...prev]);
+  }, []);
+
+  const removeMonthlyPayment = useCallback((id: string) => {
+    setMonthlyPayments((prev) => prev.filter((item) => item.id !== id));
   }, []);
 
   const addResponsible = useCallback(
@@ -252,6 +291,9 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       movements,
       addMovement,
       removeMovement,
+      monthlyPayments,
+      addMonthlyPayment,
+      removeMonthlyPayment,
       team,
       addResponsible,
       removeResponsible,
@@ -268,6 +310,9 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       movements,
       addMovement,
       removeMovement,
+      monthlyPayments,
+      addMonthlyPayment,
+      removeMonthlyPayment,
       team,
       addResponsible,
       removeResponsible,

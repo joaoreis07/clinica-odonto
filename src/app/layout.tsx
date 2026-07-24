@@ -9,8 +9,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Clínica Odonto · Financeiro",
-  description: "Sistema interno de controle financeiro da clínica",
+  title: "Clínica Odonto",
+  description: "Sistema interno — diário, financeiro e orçamentos",
 };
 
 export default function RootLayout({

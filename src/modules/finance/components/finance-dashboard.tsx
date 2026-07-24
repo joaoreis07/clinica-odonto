@@ -13,6 +13,8 @@ import {
   Wallet,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ReportDayButton } from "@/modules/reports/components/report-day-button";
+import { generateDailyReportPdf } from "@/modules/reports/generate-daily-pdf";
 import {
   Dialog,
   DialogContent,
@@ -267,11 +269,14 @@ export function FinanceDashboard() {
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between sm:gap-4">
         <div>
           <h2 className="hidden text-2xl font-semibold tracking-[-0.04em] text-slate-900 lg:block">
-            Financeiro
+            Diário
           </h2>
           <p className="text-sm capitalize text-slate-500 lg:mt-1">
             {formatLongDate(today)}
-            <span className="hidden sm:inline"> · Controle de caixa da clínica</span>
+            <span className="hidden sm:inline">
+              {" "}
+              · Tudo que entra e sai no dia
+            </span>
           </p>
           {!ready ? (
             <p className="mt-1 text-xs text-slate-400">Carregando dados…</p>
@@ -279,17 +284,23 @@ export function FinanceDashboard() {
             <p className="mt-1 text-xs text-blue-600">Sincronizando…</p>
           ) : null}
         </div>
-        <Button
-          type="button"
-          className="w-full sm:w-auto"
-          onClick={() => {
-            setForm(emptyForm());
-            setModalOpen(true);
-          }}
-        >
-          <Plus className="size-4" />
-          Nova Movimentação
-        </Button>
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+          <ReportDayButton
+            description="PDF com as entradas e saídas do dia escolhido."
+            onGenerate={(date) => generateDailyReportPdf(date, movements)}
+          />
+          <Button
+            type="button"
+            className="w-full sm:w-auto"
+            onClick={() => {
+              setForm(emptyForm());
+              setModalOpen(true);
+            }}
+          >
+            <Plus className="size-4" />
+            Nova Movimentação
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4 xl:gap-4">

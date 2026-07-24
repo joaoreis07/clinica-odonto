@@ -2,23 +2,28 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { ClipboardCheck, FileBarChart2, Settings, Wallet } from "lucide-react";
+import {
+  BookOpen,
+  ClipboardCheck,
+  Settings,
+  Wallet,
+} from "lucide-react";
 import { BudgetsDashboard } from "@/modules/budgets/components/budgets-dashboard";
 import { FinanceDashboard } from "@/modules/finance/components/finance-dashboard";
+import { MonthlyFinanceDashboard } from "@/modules/finance/components/monthly-finance-dashboard";
 import { FinanceProvider } from "@/modules/finance/context";
-import { ReportsDashboard } from "@/modules/reports/components/reports-dashboard";
 import { SettingsDashboard } from "@/modules/settings/components/settings-dashboard";
 import { cn } from "@/lib/utils";
 
 const NAV = [
+  { icon: BookOpen, label: "Diário" },
   { icon: Wallet, label: "Financeiro" },
   { icon: ClipboardCheck, label: "Orçamentos" },
-  { icon: FileBarChart2, label: "Relatórios" },
   { icon: Settings, label: "Configurações" },
 ] as const;
 
 export function AppShell() {
-  const [active, setActive] = useState<(typeof NAV)[number]["label"]>("Financeiro");
+  const [active, setActive] = useState<(typeof NAV)[number]["label"]>("Diário");
 
   return (
     <FinanceProvider>
@@ -91,12 +96,12 @@ export function AppShell() {
           </header>
 
           <main className="mx-auto max-w-7xl p-4 sm:p-5 lg:p-9">
-            {active === "Financeiro" ? (
+            {active === "Diário" ? (
               <FinanceDashboard />
+            ) : active === "Financeiro" ? (
+              <MonthlyFinanceDashboard />
             ) : active === "Orçamentos" ? (
               <BudgetsDashboard />
-            ) : active === "Relatórios" ? (
-              <ReportsDashboard />
             ) : (
               <SettingsDashboard />
             )}

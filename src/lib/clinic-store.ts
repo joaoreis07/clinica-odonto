@@ -1,6 +1,10 @@
 import { get, put } from "@vercel/blob";
 import type { FinanceMovement } from "@/modules/finance/types";
 import {
+  normalizeMonthlyPayment,
+  type MonthlyPayment,
+} from "@/modules/finance/monthly-types";
+import {
   DEFAULT_BUDGET_META,
   normalizeBudgetClosing,
   type BudgetClosing,
@@ -9,6 +13,7 @@ import {
 
 export type ClinicStore = {
   movements: FinanceMovement[];
+  monthlyPayments: MonthlyPayment[];
   team: string[];
   budgetClosings: BudgetClosing[];
   budgetMeta: BudgetMeta;
@@ -17,6 +22,7 @@ export type ClinicStore = {
 
 export const EMPTY_STORE: ClinicStore = {
   movements: [],
+  monthlyPayments: [],
   team: [],
   budgetClosings: [],
   budgetMeta: DEFAULT_BUDGET_META,
@@ -45,6 +51,11 @@ function normalizeStore(data: unknown): ClinicStore {
   const parsed = data as Partial<ClinicStore>;
   return {
     movements: Array.isArray(parsed.movements) ? parsed.movements : [],
+    monthlyPayments: Array.isArray(parsed.monthlyPayments)
+      ? parsed.monthlyPayments
+          .map((item) => normalizeMonthlyPayment(item))
+          .filter((item): item is MonthlyPayment => item !== null)
+      : [],
     team: Array.isArray(parsed.team) ? parsed.team : [],
     budgetClosings: Array.isArray(parsed.budgetClosings)
       ? parsed.budgetClosings
@@ -78,6 +89,7 @@ export async function writeClinicStore(
 ): Promise<ClinicStore> {
   const next: ClinicStore = {
     movements: store.movements,
+    monthlyPayments: store.monthlyPayments,
     team: store.team,
     budgetClosings: store.budgetClosings,
     budgetMeta: normalizeMeta(store.budgetMeta),

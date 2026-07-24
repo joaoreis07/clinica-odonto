@@ -30,7 +30,7 @@ export function generateDailyReportPdf(
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(11);
-  doc.text("Relatório Financeiro do Dia", marginX, 26);
+  doc.text("Relatório Diário do Dia", marginX, 26);
 
   doc.setFontSize(10);
   doc.setTextColor(80);
@@ -109,6 +109,5 @@ export function generateDailyReportPdf(
     Math.min(finalY + 12, 285),
   );
 
-  const fileName = `relatorio-financeiro-${dateISO}.pdf`;
-  doc.save(fileName);
+  doc.save(`relatorio-diario-${dateISO}.pdf`);
 }
