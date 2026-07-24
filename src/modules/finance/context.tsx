@@ -13,6 +13,7 @@ import {
 import type { FinanceMovement } from "./types";
 import {
   DEFAULT_BUDGET_META,
+  normalizeBudgetClosing,
   type BudgetClosing,
   type BudgetMeta,
 } from "@/modules/budgets/types";
@@ -36,6 +37,10 @@ type FinanceContextValue = {
   removeResponsible: (name: string) => void;
   budgetClosings: BudgetClosing[];
   addBudgetClosing: (closing: BudgetClosing) => void;
+  updateBudgetClosing: (
+    id: string,
+    patch: Partial<BudgetClosing> | ((current: BudgetClosing) => BudgetClosing),
+  ) => void;
   removeBudgetClosing: (id: string) => void;
   budgetMeta: BudgetMeta;
   updateBudgetMeta: (meta: BudgetMeta) => void;
@@ -107,6 +112,8 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
         const remoteTeam = Array.isArray(data.team) ? data.team : [];
         const remoteClosings = Array.isArray(data.budgetClosings)
           ? data.budgetClosings
+              .map((item) => normalizeBudgetClosing(item))
+              .filter((item): item is BudgetClosing => item !== null)
           : [];
         const remoteMeta = data.budgetMeta ?? DEFAULT_BUDGET_META;
         const local = readLocalFallback();
@@ -212,6 +219,23 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     setBudgetClosings((prev) => [closing, ...prev]);
   }, []);
 
+  const updateBudgetClosing = useCallback(
+    (
+      id: string,
+      patch:
+        | Partial<BudgetClosing>
+        | ((current: BudgetClosing) => BudgetClosing),
+    ) => {
+      setBudgetClosings((prev) =>
+        prev.map((item) => {
+          if (item.id !== id) return item;
+          return typeof patch === "function" ? patch(item) : { ...item, ...patch };
+        }),
+      );
+    },
+    [],
+  );
+
   const removeBudgetClosing = useCallback((id: string) => {
     setBudgetClosings((prev) => prev.filter((item) => item.id !== id));
   }, []);
@@ -233,6 +257,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       removeResponsible,
       budgetClosings,
       addBudgetClosing,
+      updateBudgetClosing,
       removeBudgetClosing,
       budgetMeta,
       updateBudgetMeta,
@@ -248,6 +273,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       removeResponsible,
       budgetClosings,
       addBudgetClosing,
+      updateBudgetClosing,
       removeBudgetClosing,
       budgetMeta,
       updateBudgetMeta,

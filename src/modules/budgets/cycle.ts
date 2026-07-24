@@ -66,7 +66,12 @@ export function filterCycleClosings(
   cycle: CycleRange,
 ): BudgetClosing[] {
   return [...closings]
-    .filter((item) => isInBudgetCycle(item.closedAt, cycle))
+    .filter(
+      (item) =>
+        item.status === "fechado" &&
+        item.closedAt &&
+        isInBudgetCycle(item.closedAt, cycle),
+    )
     .sort((a, b) => {
       const byDate = b.closedAt.localeCompare(a.closedAt);
       if (byDate !== 0) return byDate;

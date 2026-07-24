@@ -2,6 +2,7 @@ import { get, put } from "@vercel/blob";
 import type { FinanceMovement } from "@/modules/finance/types";
 import {
   DEFAULT_BUDGET_META,
+  normalizeBudgetClosing,
   type BudgetClosing,
   type BudgetMeta,
 } from "@/modules/budgets/types";
@@ -47,6 +48,8 @@ function normalizeStore(data: unknown): ClinicStore {
     team: Array.isArray(parsed.team) ? parsed.team : [],
     budgetClosings: Array.isArray(parsed.budgetClosings)
       ? parsed.budgetClosings
+          .map((item) => normalizeBudgetClosing(item))
+          .filter((item): item is BudgetClosing => item !== null)
       : [],
     budgetMeta: normalizeMeta(parsed.budgetMeta),
     updatedAt:

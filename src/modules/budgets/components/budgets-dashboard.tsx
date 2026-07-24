@@ -3,6 +3,8 @@
 import { useMemo, useState } from "react";
 import { motion } from "motion/react";
 import {
+  CheckCircle2,
+  ClipboardList,
   Gift,
   Plus,
   Target,
@@ -43,30 +45,40 @@ import {
   isCurrentCycle,
   listAvailableCycles,
 } from "../cycle";
-import type { BudgetClosing } from "../types";
+import {
+  budgetItemsSummary,
+  budgetItemsTotal,
+  type BudgetClosing,
+  type BudgetItem,
+} from "../types";
 
-type FormState = {
+type CreateForm = {
   patientName: string;
-  description: string;
-  amount: string;
-  closedAt: string;
   responsible: string;
   notes: string;
 };
 
-const emptyForm = (): FormState => ({
+type ItemForm = {
+  description: string;
+  amount: string;
+};
+
+const emptyCreate = (): CreateForm => ({
   patientName: "",
-  description: "",
-  amount: "",
-  closedAt: getToday(),
   responsible: "",
   notes: "",
+});
+
+const emptyItem = (): ItemForm => ({
+  description: "",
+  amount: "",
 });
 
 export function BudgetsDashboard() {
   const {
     budgetClosings,
     addBudgetClosing,
+    updateBudgetClosing,
     removeBudgetClosing,
     budgetMeta,
     updateBudgetMeta,
@@ -92,12 +104,19 @@ export function BudgetsDashboard() {
   }, [availableCycles, selectedCycleStart, currentCycle]);
 
   const viewingCurrent = isCurrentCycle(cycle);
-  const cycleClosings = useMemo(
+  const closedInCycle = useMemo(
     () => filterCycleClosings(budgetClosings, cycle),
     [budgetClosings, cycle],
   );
+  const drafts = useMemo(
+    () =>
+      budgetClosings
+        .filter((item) => item.status === "rascunho")
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+    [budgetClosings],
+  );
 
-  const totalAmount = cycleClosings.reduce((sum, item) => sum + item.amount, 0);
+  const totalAmount = closedInCycle.reduce((sum, item) => sum + item.amount, 0);
   const targetRevenue = Math.max(budgetMeta.targetRevenue, 0.01);
   const progress = Math.min(
     100,
@@ -107,13 +126,20 @@ export function BudgetsDashboard() {
   const remainingRevenue = Math.max(budgetMeta.targetRevenue - totalAmount, 0);
   const daysLeft = daysLeftInCycle(cycle);
 
-  const [modalOpen, setModalOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
   const [metaOpen, setMetaOpen] = useState(false);
-  const [form, setForm] = useState<FormState>(emptyForm);
+  const [activeBudgetId, setActiveBudgetId] = useState<string | null>(null);
+  const [createForm, setCreateForm] = useState<CreateForm>(emptyCreate);
+  const [itemForm, setItemForm] = useState<ItemForm>(emptyItem);
   const [metaForm, setMetaForm] = useState({
     targetRevenue: String(budgetMeta.targetRevenue || ""),
     bonusAmount: String(budgetMeta.bonusAmount || ""),
   });
+
+  const activeBudget = useMemo(
+    () => budgetClosings.find((item) => item.id === activeBudgetId) ?? null,
+    [budgetClosings, activeBudgetId],
+  );
 
   function openMeta() {
     setMetaForm({
@@ -138,41 +164,98 @@ export function BudgetsDashboard() {
     setMetaOpen(false);
   }
 
-  function saveClosing() {
-    const amount = Number(
-      form.amount.replace(",", ".").replace(/[^\d.]/g, ""),
-    );
-    if (
-      !form.patientName.trim() ||
-      !form.description.trim() ||
-      !form.responsible ||
-      !form.closedAt ||
-      !amount ||
-      amount <= 0
-    ) {
-      return;
-    }
+  function createDraft() {
+    if (!createForm.patientName.trim() || !createForm.responsible) return;
 
+    const today = getToday();
     const next: BudgetClosing = {
       id: `b-${Date.now()}`,
-      patientName: form.patientName.trim(),
-      description: form.description.trim(),
-      amount,
-      closedAt: form.closedAt,
-      responsible: form.responsible,
-      notes: form.notes.trim() || undefined,
+      patientName: createForm.patientName.trim(),
+      description: "Sem procedimentos",
+      amount: 0,
+      closedAt: "",
+      responsible: createForm.responsible,
+      notes: createForm.notes.trim() || undefined,
+      status: "rascunho",
+      items: [],
+      createdAt: today,
     };
 
     addBudgetClosing(next);
-    setModalOpen(false);
-    setForm(emptyForm());
+    setCreateOpen(false);
+    setCreateForm(emptyCreate);
+    setActiveBudgetId(next.id);
+    setItemForm(emptyItem);
+  }
+
+  function addProcedure() {
+    if (!activeBudget || activeBudget.status !== "rascunho") return;
+    const amount = Number(
+      itemForm.amount.replace(",", ".").replace(/[^\d.]/g, ""),
+    );
+    const description = itemForm.description.trim();
+    if (!description || !amount || amount <= 0) return;
+
+    const item: BudgetItem = {
+      id: `i-${Date.now()}`,
+      description,
+      amount,
+    };
+
+    updateBudgetClosing(activeBudget.id, (current) => {
+      const items = [...current.items, item];
+      return {
+        ...current,
+        items,
+        amount: budgetItemsTotal(items),
+        description: budgetItemsSummary(items),
+      };
+    });
+    setItemForm(emptyItem);
+  }
+
+  function removeProcedure(itemId: string) {
+    if (!activeBudget || activeBudget.status !== "rascunho") return;
+    updateBudgetClosing(activeBudget.id, (current) => {
+      const items = current.items.filter((item) => item.id !== itemId);
+      return {
+        ...current,
+        items,
+        amount: budgetItemsTotal(items),
+        description: budgetItemsSummary(items),
+      };
+    });
+  }
+
+  function finalizeBudget() {
+    if (!activeBudget || activeBudget.status !== "rascunho") return;
+    if (activeBudget.items.length === 0) {
+      window.alert("Adicione pelo menos um procedimento antes de fechar.");
+      return;
+    }
+
+    const ok = window.confirm(
+      `Fechar orçamento de ${activeBudget.patientName}?\n\nTotal: ${formatCurrency(activeBudget.amount)}`,
+    );
+    if (!ok) return;
+
+    updateBudgetClosing(activeBudget.id, {
+      status: "fechado",
+      closedAt: getToday(),
+      amount: budgetItemsTotal(activeBudget.items),
+      description: budgetItemsSummary(activeBudget.items),
+    });
+    setActiveBudgetId(null);
   }
 
   function handleDelete(item: BudgetClosing) {
+    const label =
+      item.status === "rascunho" ? "rascunho" : "orçamento fechado";
     const ok = window.confirm(
-      `Remover orçamento fechado?\n\n${item.patientName} · ${formatCurrency(item.amount)}`,
+      `Remover ${label}?\n\n${item.patientName} · ${formatCurrency(item.amount)}`,
     );
     if (!ok) return;
+    if (activeBudgetId === item.id) setActiveBudgetId(null);
     removeBudgetClosing(item.id);
   }
 
@@ -188,7 +271,7 @@ export function BudgetsDashboard() {
             {formatCycleLong(cycle)}
           </p>
           <p className="mt-1 text-xs text-slate-400">
-            Reinicia todo dia 20
+            Monte por paciente e feche o orçamento final
             {!ready
               ? " · Carregando…"
               : syncing
@@ -212,12 +295,12 @@ export function BudgetsDashboard() {
             type="button"
             className="w-full sm:w-auto"
             onClick={() => {
-              setForm(emptyForm());
-              setModalOpen(true);
+              setCreateForm(emptyCreate());
+              setCreateOpen(true);
             }}
           >
             <Plus className="size-4" />
-            Orçamento fechado
+            Novo orçamento
           </Button>
         </div>
       </div>
@@ -227,7 +310,7 @@ export function BudgetsDashboard() {
           <div>
             <p className="text-sm font-semibold text-slate-900">Ver ciclo</p>
             <p className="text-xs text-slate-500">
-              Consulte o atual e os meses anteriores.
+              Meta e fechados do ciclo selecionado.
             </p>
           </div>
           <Select
@@ -255,8 +338,8 @@ export function BudgetsDashboard() {
         {[
           {
             label: "Fechados no ciclo",
-            value: String(cycleClosings.length),
-            hint: "Orçamentos registrados",
+            value: String(closedInCycle.length),
+            hint: `${drafts.length} em montagem`,
             icon: Users,
             accent: "bg-blue-50 text-blue-600",
           },
@@ -317,7 +400,7 @@ export function BudgetsDashboard() {
               Progresso da meta de faturamento
             </h3>
             <p className="mt-1 text-xs text-slate-500">
-              Contagem reinicia todo dia 20.
+              Conta apenas orçamentos fechados no ciclo.
             </p>
           </div>
           {metaHit ? (
@@ -346,187 +429,221 @@ export function BudgetsDashboard() {
         </div>
       </div>
 
-      <div className="space-y-3 md:hidden">
-        {cycleClosings.length === 0 ? (
-          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-12 text-center text-sm text-slate-400 shadow-sm">
-            Nenhum orçamento fechado neste ciclo ainda.
+      <section className="space-y-3">
+        <div className="flex items-center gap-2">
+          <ClipboardList className="size-4 text-blue-600" />
+          <h3 className="text-sm font-semibold text-slate-900">
+            Em montagem
+          </h3>
+          <span className="rounded-lg bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-700">
+            {drafts.length}
+          </span>
+        </div>
+
+        {drafts.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-10 text-center text-sm text-slate-400">
+            Nenhum orçamento em montagem. Crie um e vá adicionando os
+            procedimentos.
           </div>
         ) : (
-          cycleClosings.map((item) => (
-            <div
-              key={item.id}
-              className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="truncate font-semibold text-slate-900">
-                    {item.patientName}
-                  </p>
-                  <p className="truncate text-sm text-slate-500">
-                    {item.description}
+          <div className="grid gap-3 md:grid-cols-2">
+            {drafts.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => {
+                  setActiveBudgetId(item.id);
+                  setItemForm(emptyItem());
+                }}
+                className="rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-blue-200 hover:shadow-md"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate font-semibold text-slate-900">
+                      {item.patientName}
+                    </p>
+                    <p className="truncate text-sm text-slate-500">
+                      {item.description}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-400">
+                      {item.items.length} procedimento(s) · {item.responsible}
+                    </p>
+                  </div>
+                  <p className="shrink-0 text-sm font-semibold text-blue-600">
+                    {formatCurrency(item.amount)}
                   </p>
                 </div>
-                <p className="shrink-0 text-sm font-semibold text-emerald-600">
-                  {formatCurrency(item.amount)}
-                </p>
-              </div>
-              <div className="mt-3 flex items-center justify-between gap-3 border-t border-slate-100 pt-3">
-                <div className="min-w-0 text-xs text-slate-400">
-                  <p>{formatDateBR(item.closedAt)}</p>
-                  <p className="truncate">Responsável: {item.responsible}</p>
-                </div>
+              </button>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="space-y-3">
+        <div className="flex items-center gap-2">
+          <CheckCircle2 className="size-4 text-emerald-600" />
+          <h3 className="text-sm font-semibold text-slate-900">
+            Fechados no ciclo
+          </h3>
+          <span className="rounded-lg bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
+            {closedInCycle.length}
+          </span>
+        </div>
+
+        <div className="space-y-3 md:hidden">
+          {closedInCycle.length === 0 ? (
+            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-12 text-center text-sm text-slate-400 shadow-sm">
+              Nenhum orçamento fechado neste ciclo.
+            </div>
+          ) : (
+            closedInCycle.map((item) => (
+              <div
+                key={item.id}
+                className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+              >
                 <button
                   type="button"
-                  onClick={() => handleDelete(item)}
-                  className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-rose-600 hover:bg-rose-50"
+                  className="w-full text-left"
+                  onClick={() => setActiveBudgetId(item.id)}
                 >
-                  <Trash2 className="size-3.5" />
-                  Apagar
-                </button>
-              </div>
-            </div>
-          ))
-        )}
-      </div>
-
-      <div className="hidden overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm md:block">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] text-left text-sm">
-            <thead>
-              <tr className="border-b border-slate-100 bg-slate-50/80">
-                {[
-                  "Data",
-                  "Paciente",
-                  "Descrição",
-                  "Valor",
-                  "Responsável",
-                  "Observação",
-                  "Ação",
-                ].map((h) => (
-                  <th
-                    key={h}
-                    className="px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-slate-400"
-                  >
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {cycleClosings.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={7}
-                    className="px-4 py-16 text-center text-sm text-slate-400"
-                  >
-                    Nenhum orçamento fechado neste ciclo ainda.
-                  </td>
-                </tr>
-              ) : (
-                cycleClosings.map((item) => (
-                  <tr
-                    key={item.id}
-                    className="border-b border-slate-50 transition hover:bg-slate-50/80"
-                  >
-                    <td className="whitespace-nowrap px-4 py-3.5 text-slate-600">
-                      {formatDateBR(item.closedAt)}
-                    </td>
-                    <td className="px-4 py-3.5 font-medium text-slate-900">
-                      {item.patientName}
-                    </td>
-                    <td className="max-w-[220px] truncate px-4 py-3.5 text-slate-600">
-                      {item.description}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3.5 font-semibold text-emerald-600">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold text-slate-900">
+                        {item.patientName}
+                      </p>
+                      <p className="truncate text-sm text-slate-500">
+                        {item.description}
+                      </p>
+                    </div>
+                    <p className="shrink-0 text-sm font-semibold text-emerald-600">
                       {formatCurrency(item.amount)}
-                    </td>
-                    <td className="whitespace-nowrap px-4 py-3.5 text-slate-600">
-                      {item.responsible}
-                    </td>
-                    <td className="max-w-[160px] truncate px-4 py-3.5 text-slate-400">
-                      {item.notes || "—"}
-                    </td>
-                    <td className="px-4 py-3.5">
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(item)}
-                        className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-rose-600 hover:bg-rose-50"
-                      >
-                        <Trash2 className="size-3.5" />
-                        Apagar
-                      </button>
+                    </p>
+                  </div>
+                </button>
+                <div className="mt-3 flex items-center justify-between gap-3 border-t border-slate-100 pt-3">
+                  <div className="min-w-0 text-xs text-slate-400">
+                    <p>{formatDateBR(item.closedAt)}</p>
+                    <p className="truncate">Responsável: {item.responsible}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(item)}
+                    className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-rose-600 hover:bg-rose-50"
+                  >
+                    <Trash2 className="size-3.5" />
+                    Apagar
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        <div className="hidden overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm md:block">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[760px] text-left text-sm">
+              <thead>
+                <tr className="border-b border-slate-100 bg-slate-50/80">
+                  {[
+                    "Data",
+                    "Paciente",
+                    "Procedimentos",
+                    "Valor",
+                    "Responsável",
+                    "Ação",
+                  ].map((h) => (
+                    <th
+                      key={h}
+                      className="px-4 py-3 text-[10px] font-semibold uppercase tracking-wider text-slate-400"
+                    >
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {closedInCycle.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={6}
+                      className="px-4 py-16 text-center text-sm text-slate-400"
+                    >
+                      Nenhum orçamento fechado neste ciclo.
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : (
+                  closedInCycle.map((item) => (
+                    <tr
+                      key={item.id}
+                      className="border-b border-slate-50 transition hover:bg-slate-50/80"
+                    >
+                      <td className="whitespace-nowrap px-4 py-3.5 text-slate-600">
+                        {formatDateBR(item.closedAt)}
+                      </td>
+                      <td className="px-4 py-3.5 font-medium text-slate-900">
+                        <button
+                          type="button"
+                          className="text-left hover:text-blue-700"
+                          onClick={() => setActiveBudgetId(item.id)}
+                        >
+                          {item.patientName}
+                        </button>
+                      </td>
+                      <td className="max-w-[240px] truncate px-4 py-3.5 text-slate-600">
+                        {item.description}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3.5 font-semibold text-emerald-600">
+                        {formatCurrency(item.amount)}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3.5 text-slate-600">
+                        {item.responsible}
+                      </td>
+                      <td className="px-4 py-3.5">
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(item)}
+                          className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-rose-600 hover:bg-rose-50"
+                        >
+                          <Trash2 className="size-3.5" />
+                          Apagar
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      </section>
 
-      <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto">
+      {/* Criar rascunho */}
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent>
           <DialogHeader>
-            <DialogTitle>Orçamento fechado</DialogTitle>
+            <DialogTitle>Novo orçamento</DialogTitle>
             <DialogDescription>
-              Registre o paciente que fechou orçamento neste ciclo.
+              Crie o orçamento do paciente e depois adicione os procedimentos.
             </DialogDescription>
           </DialogHeader>
-
           <div className="grid gap-4 py-1">
             <div className="grid gap-2">
               <Label htmlFor="patientName">Paciente</Label>
               <Input
                 id="patientName"
-                value={form.patientName}
+                value={createForm.patientName}
                 onChange={(e) =>
-                  setForm((f) => ({ ...f, patientName: e.target.value }))
+                  setCreateForm((f) => ({ ...f, patientName: e.target.value }))
                 }
                 placeholder="Nome do paciente"
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="budgetDescription">Descrição do orçamento</Label>
-              <Input
-                id="budgetDescription"
-                value={form.description}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, description: e.target.value }))
-                }
-                placeholder="Ex.: Implante, aparelho, clareamento…"
-              />
-            </div>
-            <div className="grid gap-2 sm:grid-cols-2">
-              <div className="grid gap-2">
-                <Label htmlFor="budgetAmount">Valor</Label>
-                <Input
-                  id="budgetAmount"
-                  inputMode="decimal"
-                  value={form.amount}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, amount: e.target.value }))
-                  }
-                  placeholder="0,00"
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="closedAt">Data do fechamento</Label>
-                <Input
-                  id="closedAt"
-                  type="date"
-                  value={form.closedAt}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, closedAt: e.target.value }))
-                  }
-                />
-              </div>
-            </div>
-            <div className="grid gap-2">
               <Label>Responsável</Label>
               <Select
-                value={form.responsible || undefined}
+                value={createForm.responsible || undefined}
                 onValueChange={(v) =>
-                  setForm((f) => ({ ...f, responsible: v }))
+                  setCreateForm((f) => ({ ...f, responsible: v }))
                 }
               >
                 <SelectTrigger>
@@ -534,7 +651,7 @@ export function BudgetsDashboard() {
                     placeholder={
                       team.length === 0
                         ? "Cadastre em Configurações"
-                        : "Quem fechou"
+                        : "Quem está montando"
                     }
                   />
                 </SelectTrigger>
@@ -557,27 +674,187 @@ export function BudgetsDashboard() {
               <Label htmlFor="budgetNotes">Observações</Label>
               <Textarea
                 id="budgetNotes"
-                value={form.notes}
+                value={createForm.notes}
                 onChange={(e) =>
-                  setForm((f) => ({ ...f, notes: e.target.value }))
+                  setCreateForm((f) => ({ ...f, notes: e.target.value }))
                 }
                 placeholder="Opcional"
               />
             </div>
           </div>
-
           <DialogFooter>
             <Button
               type="button"
               variant="outline"
-              onClick={() => setModalOpen(false)}
+              onClick={() => setCreateOpen(false)}
             >
               Cancelar
             </Button>
-            <Button type="button" onClick={saveClosing}>
-              Salvar
+            <Button type="button" onClick={createDraft}>
+              Começar montagem
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Montagem / detalhe */}
+      <Dialog
+        open={!!activeBudget}
+        onOpenChange={(open) => {
+          if (!open) setActiveBudgetId(null);
+        }}
+      >
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+          {activeBudget ? (
+            <>
+              <DialogHeader>
+                <DialogTitle>{activeBudget.patientName}</DialogTitle>
+                <DialogDescription>
+                  {activeBudget.status === "rascunho"
+                    ? "Adicione os procedimentos e feche o orçamento no final."
+                    : "Orçamento fechado — visualização organizada."}
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-4 py-1">
+                <div className="grid gap-2 rounded-xl bg-slate-50 p-3 text-sm text-slate-600 sm:grid-cols-2">
+                  <p>
+                    <span className="text-slate-400">Responsável: </span>
+                    {activeBudget.responsible || "—"}
+                  </p>
+                  <p>
+                    <span className="text-slate-400">Status: </span>
+                    {activeBudget.status === "rascunho"
+                      ? "Em montagem"
+                      : `Fechado em ${formatDateBR(activeBudget.closedAt)}`}
+                  </p>
+                  {activeBudget.notes ? (
+                    <p className="sm:col-span-2">
+                      <span className="text-slate-400">Obs.: </span>
+                      {activeBudget.notes}
+                    </p>
+                  ) : null}
+                </div>
+
+                {activeBudget.status === "rascunho" ? (
+                  <div className="grid gap-3 rounded-2xl border border-slate-200 p-3 sm:grid-cols-[1fr_140px_auto]">
+                    <div className="grid gap-1.5">
+                      <Label htmlFor="procDesc">Procedimento</Label>
+                      <Input
+                        id="procDesc"
+                        value={itemForm.description}
+                        onChange={(e) =>
+                          setItemForm((f) => ({
+                            ...f,
+                            description: e.target.value,
+                          }))
+                        }
+                        placeholder="Ex.: Restauração, extração…"
+                      />
+                    </div>
+                    <div className="grid gap-1.5">
+                      <Label htmlFor="procAmount">Valor</Label>
+                      <Input
+                        id="procAmount"
+                        inputMode="decimal"
+                        value={itemForm.amount}
+                        onChange={(e) =>
+                          setItemForm((f) => ({ ...f, amount: e.target.value }))
+                        }
+                        placeholder="0,00"
+                      />
+                    </div>
+                    <div className="flex items-end">
+                      <Button
+                        type="button"
+                        className="w-full"
+                        onClick={addProcedure}
+                      >
+                        <Plus className="size-4" />
+                        Adicionar
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
+
+                <div className="overflow-hidden rounded-2xl border border-slate-200">
+                  <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-4 py-3">
+                    <p className="text-sm font-semibold text-slate-900">
+                      Procedimentos
+                    </p>
+                    <p className="text-sm font-semibold text-emerald-600">
+                      Total {formatCurrency(activeBudget.amount)}
+                    </p>
+                  </div>
+                  {activeBudget.items.length === 0 ? (
+                    <p className="px-4 py-10 text-center text-sm text-slate-400">
+                      Nenhum procedimento ainda.
+                    </p>
+                  ) : (
+                    <ul className="divide-y divide-slate-100">
+                      {activeBudget.items.map((item, index) => (
+                        <li
+                          key={item.id}
+                          className="flex items-start justify-between gap-3 px-4 py-3"
+                        >
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold text-slate-400">
+                              {String(index + 1).padStart(2, "0")}
+                            </p>
+                            <p className="font-medium text-slate-900">
+                              {item.description}
+                            </p>
+                          </div>
+                          <div className="flex shrink-0 items-center gap-2">
+                            <p className="text-sm font-semibold text-emerald-600">
+                              {formatCurrency(item.amount)}
+                            </p>
+                            {activeBudget.status === "rascunho" ? (
+                              <button
+                                type="button"
+                                onClick={() => removeProcedure(item.id)}
+                                className="rounded-lg p-1.5 text-rose-600 hover:bg-rose-50"
+                                title="Remover"
+                              >
+                                <Trash2 className="size-3.5" />
+                              </button>
+                            ) : null}
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
+
+              <DialogFooter className="gap-2 sm:justify-between">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="text-rose-600 hover:bg-rose-50 hover:text-rose-700"
+                  onClick={() => handleDelete(activeBudget)}
+                >
+                  <Trash2 className="size-4" />
+                  Apagar
+                </Button>
+                <div className="flex flex-col-reverse gap-2 sm:flex-row">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setActiveBudgetId(null)}
+                  >
+                    Fechar
+                  </Button>
+                  {activeBudget.status === "rascunho" ? (
+                    <Button type="button" onClick={finalizeBudget}>
+                      <CheckCircle2 className="size-4" />
+                      Fechar orçamento final
+                    </Button>
+                  ) : null}
+                </div>
+              </DialogFooter>
+            </>
+          ) : null}
         </DialogContent>
       </Dialog>
 
