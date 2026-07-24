@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { motion } from "motion/react";
 import {
   CalendarDays,
+  FileDown,
   Plus,
   Trash2,
   Users,
@@ -39,8 +40,7 @@ import {
   formatLongDate,
   paymentBadgeClass,
 } from "../utils";
-import { ReportDayButton } from "@/modules/reports/components/report-day-button";
-import { generateMonthlyFinanceDayPdf } from "@/modules/reports/generate-monthly-day-pdf";
+import { generateMonthlyFinancePdf } from "@/modules/reports/generate-monthly-finance-pdf";
 
 function currentMonthValue() {
   return getToday().slice(0, 7);
@@ -136,7 +136,7 @@ export function MonthlyFinanceDashboard() {
             Financeiro
           </h2>
           <p className="text-sm text-slate-500 lg:mt-1">
-            Quem pagou mensalmente · {formatMonthLabel(monthFilter)}
+            Quem pagou no mês · {formatMonthLabel(monthFilter)}
           </p>
           {!ready ? (
             <p className="mt-1 text-xs text-slate-400">Carregando dados…</p>
@@ -145,12 +145,17 @@ export function MonthlyFinanceDashboard() {
           ) : null}
         </div>
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
-          <ReportDayButton
-            description="PDF com as mensalidades recebidas no dia escolhido."
-            onGenerate={(date) =>
-              generateMonthlyFinanceDayPdf(date, monthlyPayments)
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full sm:w-auto"
+            onClick={() =>
+              generateMonthlyFinancePdf(monthFilter, monthlyPayments)
             }
-          />
+          >
+            <FileDown className="size-4" />
+            Relatório do mês
+          </Button>
           <Button
             type="button"
             className="w-full sm:w-auto"

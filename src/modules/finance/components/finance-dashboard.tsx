@@ -286,6 +286,7 @@ export function FinanceDashboard() {
         </div>
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
           <ReportDayButton
+            label="Relatório do dia"
             description="PDF com as entradas e saídas do dia escolhido."
             onGenerate={(date) => generateDailyReportPdf(date, movements)}
           />

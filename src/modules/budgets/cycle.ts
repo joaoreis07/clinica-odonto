@@ -107,6 +107,7 @@ export function formatCycleOption(cycle: CycleRange): string {
 export function listAvailableCycles(
   closings: BudgetClosing[],
   ref: Date = new Date(),
+  extraDates: string[] = [],
 ): CycleRange[] {
   const current = getBudgetCycle(ref);
   const cycles: CycleRange[] = [];
@@ -130,6 +131,11 @@ export function listAvailableCycles(
   for (const item of closings) {
     if (!item.closedAt) continue;
     push(getBudgetCycle(parseISO(item.closedAt)));
+  }
+
+  for (const iso of extraDates) {
+    if (!iso) continue;
+    push(getBudgetCycle(parseISO(iso)));
   }
 
   return cycles.sort((a, b) => b.startISO.localeCompare(a.startISO));

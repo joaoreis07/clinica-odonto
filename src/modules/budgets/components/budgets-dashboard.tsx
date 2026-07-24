@@ -5,6 +5,7 @@ import { motion } from "motion/react";
 import {
   CheckCircle2,
   ClipboardList,
+  FileDown,
   Gift,
   Plus,
   Target,
@@ -36,8 +37,7 @@ import { cn } from "@/lib/utils";
 import { useFinance } from "@/modules/finance/context";
 import { getToday } from "@/modules/finance/data";
 import { formatCurrency, formatDateBR } from "@/modules/finance/utils";
-import { ReportDayButton } from "@/modules/reports/components/report-day-button";
-import { generateBudgetsDayPdf } from "@/modules/reports/generate-budgets-day-pdf";
+import { generateBudgetsCyclePdf } from "@/modules/reports/generate-budgets-cycle-pdf";
 import {
   daysLeftInCycle,
   filterCycleClosings,
@@ -284,12 +284,15 @@ export function BudgetsDashboard() {
           </p>
         </div>
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
-          <ReportDayButton
-            description="PDF com os orçamentos fechados no dia escolhido."
-            onGenerate={(date) =>
-              generateBudgetsDayPdf(date, budgetClosings)
-            }
-          />
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full sm:w-auto"
+            onClick={() => generateBudgetsCyclePdf(cycle, closedInCycle)}
+          >
+            <FileDown className="size-4" />
+            Relatório de orçamentos
+          </Button>
           <Button
             type="button"
             variant="outline"

@@ -4,42 +4,32 @@ import type { MonthlyPayment } from "@/modules/finance/monthly-types";
 import {
   formatCurrency,
   formatDateBR,
-  formatLongDate,
 } from "@/modules/finance/utils";
 
-function capitalize(text: string) {
-  return text.charAt(0).toUpperCase() + text.slice(1);
-}
-
-function formatMonthLabel(yyyyMm: string) {
+function formatMonthTitle(yyyyMm: string) {
   const [y, m] = yyyyMm.split("-");
-  const months = [
-    "jan",
-    "fev",
-    "mar",
-    "abr",
-    "mai",
-    "jun",
-    "jul",
-    "ago",
-    "set",
-    "out",
-    "nov",
-    "dez",
-  ];
-  const idx = Number(m) - 1;
-  return `${months[idx] ?? m}/${y}`;
+  const date = new Date(Number(y), Number(m) - 1, 1);
+  const label = date.toLocaleDateString("pt-BR", {
+    month: "long",
+    year: "numeric",
+  });
+  return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
-export function generateMonthlyFinanceDayPdf(
-  dateISO: string,
+/** Relatório mensal de quem pagou (mês civil, sem ciclo dia 20). */
+export function generateMonthlyFinancePdf(
+  referenceMonth: string,
   payments: MonthlyPayment[],
 ) {
-  const dayPayments = [...payments]
-    .filter((p) => p.paidAt === dateISO)
-    .sort((a, b) => a.patientName.localeCompare(b.patientName, "pt-BR"));
+  const monthPayments = [...payments]
+    .filter((p) => p.referenceMonth === referenceMonth)
+    .sort((a, b) => {
+      const byDate = a.paidAt.localeCompare(b.paidAt);
+      if (byDate !== 0) return byDate;
+      return a.patientName.localeCompare(b.patientName, "pt-BR");
+    });
 
-  const total = dayPayments.reduce((s, p) => s + p.amount, 0);
+  const total = monthPayments.reduce((s, p) => s + p.amount, 0);
 
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const marginX = 14;
@@ -50,32 +40,31 @@ export function generateMonthlyFinanceDayPdf(
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(11);
-  doc.text("Relatório Financeiro — Mensalidades do Dia", marginX, 26);
+  doc.text("Relatório Financeiro — Quem pagou no mês", marginX, 26);
 
   doc.setFontSize(10);
   doc.setTextColor(80);
-  doc.text(capitalize(formatLongDate(dateISO)), marginX, 33);
-  doc.text(`Gerado em: ${formatDateBR(dateISO)}`, marginX, 39);
+  doc.text(formatMonthTitle(referenceMonth), marginX, 33);
   doc.setTextColor(0);
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
-  doc.text("Resumo", marginX, 50);
+  doc.text("Resumo", marginX, 46);
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(10);
-  doc.text(`Pagamentos: ${dayPayments.length}`, marginX, 58);
-  doc.text(`Total recebido: ${formatCurrency(total)}`, marginX, 64);
+  doc.text(`Pacientes que pagaram: ${monthPayments.length}`, marginX, 54);
+  doc.text(`Total recebido: ${formatCurrency(total)}`, marginX, 60);
 
   autoTable(doc, {
-    startY: 74,
-    head: [["Paciente", "Mês ref.", "Pagamento", "Valor", "Responsável"]],
+    startY: 70,
+    head: [["Paciente", "Pago em", "Pagamento", "Valor", "Responsável"]],
     body:
-      dayPayments.length === 0
-        ? [["—", "—", "Sem mensalidades neste dia", "—", "—"]]
-        : dayPayments.map((p) => [
+      monthPayments.length === 0
+        ? [["—", "—", "Ninguém pagou neste mês", "—", "—"]]
+        : monthPayments.map((p) => [
             p.patientName,
-            formatMonthLabel(p.referenceMonth),
+            formatDateBR(p.paidAt),
             p.paymentMethod,
             formatCurrency(p.amount),
             p.responsible,
@@ -103,5 +92,5 @@ export function generateMonthlyFinanceDayPdf(
     Math.min(finalY + 12, 285),
   );
 
-  doc.save(`relatorio-financeiro-mensalidades-${dateISO}.pdf`);
+  doc.save(`relatorio-mensalidades-${referenceMonth}.pdf`);
 }
